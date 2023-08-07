@@ -1899,7 +1899,6 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
           });
         }
       }
-
       clearStyleChangeType();
       return true;
     }
@@ -1924,6 +1923,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   BoundingClientRect get boundingClientRect {
     BoundingClientRect boundingClientRect = BoundingClientRect.zero;
     if (isRendererAttached) {
+      ownerDocument.updateStyleIfNeeded();
       flushLayout();
       RenderBoxModel sizedBox = renderBoxModel!;
       // Force flush layout.
