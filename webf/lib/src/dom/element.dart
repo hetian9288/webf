@@ -1954,6 +1954,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   // of the current element is offset to the left within the HTMLElement.offsetParent node.
   // https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsetleft
   double get offsetLeft {
+    ownerDocument.updateStyleIfNeeded();
     double offset = 0.0;
     if (!isRendererAttached) {
       return offset;
@@ -1967,6 +1968,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   // of the current element relative to the inner border of the top of the offsetParent node.
   // https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsettop
   double get offsetTop {
+    ownerDocument.updateStyleIfNeeded();
     double offset = 0.0;
     if (!isRendererAttached) {
       return offset;
