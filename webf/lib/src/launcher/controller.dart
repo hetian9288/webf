@@ -209,6 +209,33 @@ class WebFViewController implements WidgetsBindingObserver {
     _nativeObjects.remove(pointer.address);
   }
 
+  // fix New version of chrome devTools castrating the last three digits of long targetId num strings and replacing them with 0
+  int _nodeIdCount = 0;
+  final Map<int, int> _targetIdToDevNodeIdMap = {};
+  Map<int, int> get targetIdToDevNodeIdMap => _targetIdToDevNodeIdMap;
+
+  int getTargetIdByNodeId(int? address) {
+    if (address == null) {
+      return 0;
+    }
+    int targetId = targetIdToDevNodeIdMap.keys.firstWhere((k) => targetIdToDevNodeIdMap[k] == address, orElse: () => 0);
+    return targetId;
+  }
+
+  int forDevtoolsNodeId(BindingObject object) {
+    int? nativeAddress = object.pointer?.address;
+    if (nativeAddress != null) {
+      if (targetIdToDevNodeIdMap[nativeAddress] != null) {
+        return targetIdToDevNodeIdMap[nativeAddress]!;
+      }
+      _nodeIdCount ++;
+      targetIdToDevNodeIdMap[nativeAddress] = _nodeIdCount;
+      return _nodeIdCount;
+    }
+    return 0;
+  }
+  // fix New version of chrome devTools end
+
   // Index value which identify javascript runtime context.
   late int _contextId;
   int get contextId => _contextId;
@@ -324,6 +351,8 @@ class WebFViewController implements WidgetsBindingObserver {
 
     document.dispose();
     window.dispose();
+
+    _targetIdToDevNodeIdMap.clear();
   }
 
   VoidCallback? _originalOnPlatformBrightnessChanged;
