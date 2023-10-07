@@ -657,16 +657,19 @@ class WebFViewController implements WidgetsBindingObserver, ElementsBindingObser
   void didChangeLocales(List<Locale>? locales) {
   }
 
-  ui.WindowPadding _prevViewInsets = ui.window.viewInsets;
   static double FOCUS_VIEWINSET_BOTTOM_OVERALL = 32;
 
   @override
   void didChangeMetrics() {
-    double bottomInset = ui.window.viewInsets.bottom / ui.window.devicePixelRatio;
-    if (_prevViewInsets.bottom > ui.window.viewInsets.bottom) {
-      // Hide keyboard
-      viewport.bottomInset = bottomInset;
+    final bool resizeToAvoidBottomInsets = rootController.resizeToAvoidBottomInsets;
+    final double bottomInsets;
+    if (resizeToAvoidBottomInsets) {
+      bottomInsets = ui.window.viewInsets.bottom / ui.window.devicePixelRatio;
     } else {
+      bottomInsets = 0;
+    }
+
+    if (resizeToAvoidBottomInsets) {
       bool shouldScrollByToCenter = false;
       Element? focusedElement = document.focusedElement;
       double scrollOffset = 0;
@@ -675,20 +678,19 @@ class WebFViewController implements WidgetsBindingObserver, ElementsBindingObser
         if (renderer != null && renderer.attached && renderer.hasSize) {
           Offset focusOffset = renderer.localToGlobal(Offset.zero);
           // FOCUS_VIEWINSET_BOTTOM_OVERALL to meet border case.
-          if (focusOffset.dy > viewportHeight - bottomInset - FOCUS_VIEWINSET_BOTTOM_OVERALL) {
+          if (focusOffset.dy > viewportHeight - bottomInsets - FOCUS_VIEWINSET_BOTTOM_OVERALL) {
             shouldScrollByToCenter = true;
             scrollOffset =
-                focusOffset.dy - (viewportHeight - bottomInset) + renderer.size.height + FOCUS_VIEWINSET_BOTTOM_OVERALL;
+                focusOffset.dy - (viewportHeight - bottomInsets) + renderer.size.height + FOCUS_VIEWINSET_BOTTOM_OVERALL;
           }
         }
       }
       // Show keyboard
-      viewport.bottomInset = bottomInset;
       if (shouldScrollByToCenter) {
         window.scrollBy(0, scrollOffset, true);
       }
     }
-    _prevViewInsets = ui.window.viewInsets;
+    viewport.bottomInset = bottomInsets;
   }
 
   @override
@@ -795,6 +797,8 @@ class WebFController {
 
   final List<Cookie>? initialCookies;
 
+  bool resizeToAvoidBottomInsets;
+
   String? _name;
   String? get name => _name;
   set name(String? value) {
@@ -834,6 +838,7 @@ class WebFController {
     this.devToolsService,
     this.uriParser,
     this.initialCookies,
+    this.resizeToAvoidBottomInsets = true,
   })  : _name = name,
         _entrypoint = entrypoint,
         _gestureListener = gestureListener {
