@@ -10,9 +10,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:webf/webf.dart';
 import 'package:webf/gesture.dart';
-import 'package:webf/css.dart';
 
 typedef OnControllerCreated = void Function(WebFController controller);
 
@@ -73,6 +73,8 @@ class WebF extends StatefulWidget {
   /// The initial cookies to set.
   final List<Cookie>? initialCookies;
 
+  final WebFController? _controller;
+
   /// If true the content should size itself to avoid the onscreen keyboard
   /// whose height is defined by the ambient [FlutterView]'s
   /// [FlutterView.viewInsets] `bottom` property.
@@ -85,7 +87,7 @@ class WebF extends StatefulWidget {
   final bool resizeToAvoidBottomInsets;
 
   WebFController? get controller {
-    return WebFController.getControllerOfName(shortHash(this));
+    return _controller ?? WebFController.getControllerOfName(shortHash(this));
   }
 
   // Set webf http cache mode.
@@ -134,6 +136,7 @@ class WebF extends StatefulWidget {
       this.routeObserver,
       this.initialCookies,
       this.preloadedBundles,
+      WebFController? controller,
       // webf's viewportWidth options only works fine when viewportWidth is equal to window.physicalSize.width / window.devicePixelRatio.
       // Maybe got unexpected error when change to other values, use this at your own risk!
       // We will fixed this on next version released. (v0.6.0)
@@ -149,7 +152,8 @@ class WebF extends StatefulWidget {
       this.animationController,
       this.onJSError,
       this.resizeToAvoidBottomInsets = true})
-      : super(key: key);
+      : _controller = controller,
+        super(key: key);
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -227,7 +231,6 @@ class WebFState extends State<WebF> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    FlutterView currentView = View.of(context);
     if (!_flutterScreenIsReady) {
       return SizedBox(width: 0, height: 0);
     }
@@ -236,7 +239,6 @@ class WebFState extends State<WebF> with RouteAware {
       child: WebFContext(
         child: WebFRootRenderObjectWidget(
           widget,
-          currentView: currentView,
           onCustomElementAttached: onCustomElementWidgetAdd,
           onCustomElementDetached: onCustomElementWidgetRemove,
           children: customElementWidgets.toList(),
@@ -320,7 +322,6 @@ class WebFContextInheritElement extends InheritedElement {
 class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
   final OnCustomElementAttached onCustomElementAttached;
   final OnCustomElementDetached onCustomElementDetached;
-  final FlutterView currentView;
   final bool resizeToAvoidBottomInsets;
 
   // Creates a widget that visually hides its child.
@@ -328,7 +329,6 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
     WebF widget, {
     Key? key,
     required List<Widget> children,
-    required this.currentView,
     required this.onCustomElementAttached,
     required this.onCustomElementDetached,
     this.resizeToAvoidBottomInsets = true,
@@ -339,13 +339,12 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    double viewportWidth = _webfWidget.viewportWidth ?? currentView.physicalSize.width / currentView.devicePixelRatio;
-    double viewportHeight =
-        _webfWidget.viewportHeight ?? currentView.physicalSize.height / currentView.devicePixelRatio;
-
-    WebFController controller = WebFController(shortHash(_webfWidget), viewportWidth, viewportHeight,
+    WebFController controller = _webfWidget.controller ?? WebFController(context,
+        name: shortHash(_webfWidget),
+        viewportWidth: _webfWidget.viewportWidth,
+        viewportHeight: _webfWidget.viewportHeight,
         background: _webfWidget.background,
-        entrypoint: _webfWidget.bundle,
+        bundle: _webfWidget.bundle,
         // Execute entrypoint when mount manually.
         autoExecuteEntrypoint: false,
         onLoad: _webfWidget.onLoad,
@@ -362,7 +361,6 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
         initialCookies: _webfWidget.initialCookies,
         uriParser: _webfWidget.uriParser,
         preloadedBundles: _webfWidget.preloadedBundles,
-        ownerFlutterView: currentView,
         resizeToAvoidBottomInsets: resizeToAvoidBottomInsets);
 
     (context as _WebFRenderObjectElement).controller = controller;
@@ -383,24 +381,11 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
 
     controller.name = shortHash(_webfWidget);
 
-    bool viewportWidthHasChanged = controller.view.viewportWidth != _webfWidget.viewportWidth;
-    bool viewportHeightHasChanged = controller.view.viewportHeight != _webfWidget.viewportHeight;
-
-    double viewportWidth = _webfWidget.viewportWidth ?? currentView.physicalSize.width / currentView.devicePixelRatio;
-    double viewportHeight =
-        _webfWidget.viewportHeight ?? currentView.physicalSize.height / currentView.devicePixelRatio;
-
-    if (controller.view.document.documentElement == null) return;
-
-    if (viewportWidthHasChanged) {
-      controller.view.viewportWidth = viewportWidth;
-      controller.view.document.documentElement!.renderStyle.width = CSSLengthValue(viewportWidth, CSSLengthType.PX);
-    }
-
-    if (viewportHeightHasChanged) {
-      controller.view.viewportHeight = viewportHeight;
-      controller.view.document.documentElement!.renderStyle.height = CSSLengthValue(viewportHeight, CSSLengthType.PX);
-    }
+    // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      // Sync viewport size to the documentElement.
+      controller.view.document.initializeRootElementSize();
+    });
   }
 
   @override
@@ -420,13 +405,27 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
     assert(parent is WebFContextInheritElement);
     assert(controller != null);
     (parent as WebFContextInheritElement).controller = controller;
-    await controller!.executeEntrypoint(animationController: widget._webfWidget.animationController);
+
+    // Sync element state.
+    flushUICommand(controller!.view);
+
+    // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      // Sync viewport size to the documentElement.
+      controller!.view.document.initializeRootElementSize();
+      // Bundle could be executed before mount to the flutter tree.
+      if (!controller!.preloaded) {
+        await controller!.executeEntrypoint(animationController: widget._webfWidget.animationController);
+      }
+    });
   }
 
   @override
   void unmount() {
     super.unmount();
-    controller?.dispose();
+    if (controller?.preloaded == false) {
+      controller?.dispose();
+    }
     controller = null;
   }
 

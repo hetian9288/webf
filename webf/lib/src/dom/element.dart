@@ -381,7 +381,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
         RenderBoxModel.detachRenderBox(previousRenderBoxModel);
 
-        if (parentRenderObject != null && parentRenderObject.attached) {
+        if (parentRenderObject != null) {
           RenderBoxModel.attachRenderBox(parentRenderObject, nextRenderBoxModel, after: after);
         }
       }
@@ -710,10 +710,10 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   List<Element> findNestedPositionAbsoluteChildren() {
     List<Element> positionAbsoluteChildren = [];
 
-    if (!isRendererAttached) return positionAbsoluteChildren;
+    if (!isRendererAttachedToSegmentTree) return positionAbsoluteChildren;
 
     children.forEach((Element child) {
-      if (!child.isRendererAttached) return;
+      if (!child.isRendererAttachedToSegmentTree) return;
 
       RenderBoxModel childRenderBoxModel = child.renderBoxModel!;
       RenderStyle childRenderStyle = childRenderBoxModel.renderStyle;
@@ -749,7 +749,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   List<Element> findDirectPositionAbsoluteChildren() {
     List<Element> directPositionAbsoluteChildren = [];
 
-    if (!isRendererAttached) return directPositionAbsoluteChildren;
+    if (!isRendererAttachedToSegmentTree) return directPositionAbsoluteChildren;
 
     RenderBox? child = (renderBoxModel as RenderLayoutBox).firstChild;
 
@@ -979,7 +979,6 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
     }
 
     if (renderer != null) {
-      assert(parent.renderer!.attached);
       // If element attach WidgetElement, render object should be attach to render tree when mount.
       if (parent.renderObjectManagerType == RenderObjectManagerType.WEBF_NODE) {
         RenderBoxModel.attachRenderBox(parent.renderer!, renderer!, after: after);
@@ -1039,7 +1038,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
   @override
   void ensureChildAttached() {
-    if (isRendererAttached) {
+    if (isRendererAttachedToSegmentTree) {
       final box = renderBoxModel;
       if (box == null) return;
       for (Node child in childNodes) {
@@ -1054,7 +1053,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
         } else if (box is RenderSVGContainer) {
           after = box.lastChild;
         }
-        if (!child.isRendererAttached) {
+        if (!child.isRendererAttachedToSegmentTree) {
           child.attachTo(this, after: after);
           child.ensureChildAttached();
         }
@@ -1072,9 +1071,9 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
     }
 
     final box = renderBoxModel;
-    if (isRendererAttached) {
+    if (isRendererAttachedToSegmentTree) {
       // Only append child renderer when which is not attached.
-      if (!child.isRendererAttached && box != null && renderObjectManagerType == RenderObjectManagerType.WEBF_NODE) {
+      if (!child.isRendererAttachedToSegmentTree && box != null && renderObjectManagerType == RenderObjectManagerType.WEBF_NODE) {
         RenderBox? after;
         if (box is RenderLayoutBox) {
           RenderLayoutBox? scrollingContentBox = box.renderScrollingContent;
@@ -1117,12 +1116,12 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
       child.renderStyle.parent = renderStyle;
     }
 
-    if (isRendererAttached) {
+    if (isRendererAttachedToSegmentTree) {
       // If afterRenderObject is null, which means insert child at the head of parent.
       RenderBox? afterRenderObject = originalPreviousSibling?.renderer;
 
       // Only append child renderer when which is not attached.
-      if (!child.isRendererAttached) {
+      if (!child.isRendererAttachedToSegmentTree) {
         // Found the most closed
         if (afterRenderObject == null) {
           Node? ref = originalPreviousSibling?.previousSibling;
@@ -1137,10 +1136,10 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
         if (renderStyle.display == CSSDisplay.sliver &&
             referenceNode is Element &&
             referenceNode.renderer != null &&
-            referenceNode.isRendererAttached) {
+            referenceNode.isRendererAttachedToSegmentTree) {
           Node? reference = referenceNode;
           while (reference != null) {
-            if (reference.isRendererAttached && reference is Element) {
+            if (reference.isRendererAttachedToSegmentTree && reference is Element) {
               if (reference.renderer != null &&
                   reference.renderer!.parent != null &&
                   reference.renderer!.parent is RenderSliverRepaintProxy) {
@@ -1327,7 +1326,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
     // Update renderBoxModel.
     updateRenderBoxModel();
     // Attach renderBoxModel to parent if change from `display: none` to other values.
-    if (!isRendererAttached && parentElement != null && parentElement!.isRendererAttached) {
+    if (!isRendererAttachedToSegmentTree && parentElement != null && parentElement!.isRendererAttachedToSegmentTree) {
       // If element attach WidgetElement, render object should be attach to render tree when mount.
       if (parentElement!.renderObjectManagerType == RenderObjectManagerType.WEBF_NODE) {
         RenderBoxModel _renderBoxModel = renderBoxModel!;
