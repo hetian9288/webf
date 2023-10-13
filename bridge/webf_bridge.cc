@@ -75,6 +75,18 @@ int8_t evaluateScripts(void* page_,
   return page->evaluateScript(code, code_len, parsed_bytecodes, bytecode_len, bundleFilename, startLine) ? 1 : 0;
 }
 
+void dumpQuickjsByteCode(void* page_,
+                         const char* code,
+                         int32_t code_len,
+                         uint8_t** parsed_bytecodes,
+                         uint64_t* bytecode_len,
+                         const char* url) {
+  auto page = reinterpret_cast<webf::WebFPage*>(page_);
+  assert(std::this_thread::get_id() == page->currentThread());
+  uint8_t* bytes = page->dumpByteCode(code, code_len, url, bytecode_len);
+  *parsed_bytecodes = bytes;
+}
+
 int8_t evaluateQuickjsByteCode(void* page_, uint8_t* bytes, int32_t byteLen) {
   auto page = reinterpret_cast<webf::WebFPage*>(page_);
   assert(std::this_thread::get_id() == page->currentThread());

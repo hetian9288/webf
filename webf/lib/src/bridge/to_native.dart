@@ -212,6 +212,30 @@ void parseHTML(int contextId, Uint8List codeBytes) {
   malloc.free(codePtr);
 }
 
+typedef NativeDumpQuickjsByteCode = Void Function(Pointer<Void>, Pointer<Uint8> code, Uint64 code_len, Pointer<Pointer<Uint8>> parsedBytecodes, Pointer<Uint64> bytecodeLen, Pointer<Utf8> url);
+typedef DartDumpQuickjsByteCode = void Function(Pointer<Void>, Pointer<Uint8> code, int code_len, Pointer<Pointer<Uint8>> parsedBytecodes, Pointer<Uint64> bytecodeLen, Pointer<Utf8> url);
+
+final DartDumpQuickjsByteCode _dumpQuickjsByteCode = WebFDynamicLibrary.ref.lookup<NativeFunction<NativeDumpQuickjsByteCode>>('dumpQuickjsByteCode').asFunction();
+
+Uint8List dumpQuickjsByteCode(int contextId, Uint8List code, {String? url}) {
+  // Assign `vm://$id` for no url (anonymous scripts).
+  if (url == null) {
+    url = 'vm://$_anonymousScriptEvaluationId';
+    _anonymousScriptEvaluationId++;
+  }
+
+  Pointer<Uint8> codePtr = uint8ListToPointer(code);
+
+  Pointer<Utf8> _url = url.toNativeUtf8();
+  // Export the bytecode from scripts
+  Pointer<Pointer<Uint8>> bytecodes = malloc.allocate(sizeOf<Pointer<Uint8>>());
+  Pointer<Uint64> bytecodeLen = malloc.allocate(sizeOf<Uint64>());
+  _dumpQuickjsByteCode(_allocatedPages[contextId]!, codePtr, code.length, bytecodes, bytecodeLen, _url);
+  Uint8List bytes = bytecodes.value.asTypedList(bytecodeLen.value);
+
+  return bytes;
+}
+
 // Register initJsEngine
 typedef NativeInitDartIsolateContext = Pointer<Void> Function(Pointer<Uint64> dartMethods, Int32 methodsLength);
 typedef DartInitDartIsolateContext = Pointer<Void> Function(Pointer<Uint64> dartMethods, int methodsLength);
