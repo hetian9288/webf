@@ -423,7 +423,8 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
 
     RenderViewportBox rootRenderObject = renderObject as RenderViewportBox;
     if (!controller!.view.firstLoad) {
-      rootRenderObject.insert(controller!.view.getRootRenderObject());
+      rootRenderObject.insert(controller!.view.getRootRenderObject()!);
+      controller!.resume();
     }
 
     // Sync element state.
@@ -453,11 +454,12 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
             await controller!.evaluateEntrypoint();
           }
         } else if (controller!.mode == WebFLoadingMode.preRendering) {
-          controller!.module.resumeTimer();
           controller!.module.resumeAnimationFrame();
-          controller!.view.resumeAnimationTimeline();
+
           HTMLElement rootElement = controller!.view.document.documentElement as HTMLElement;
           rootElement.flushPendingStylePropertiesForWholeTree();
+
+          controller!.view.resumeAnimationTimeline();
 
           controller!.dispatchDOMContentLoadedEvent();
           controller!.dispatchWindowLoadEvent();
@@ -473,7 +475,9 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
   @override
   void unmount() {
     super.unmount();
-    if (controller?.externalController == false) {
+    if (controller?.externalController == true) {
+      controller?.pause();
+    } else {
       controller?.dispose();
     }
     controller = null;

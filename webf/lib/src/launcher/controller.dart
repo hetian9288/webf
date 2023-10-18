@@ -654,8 +654,8 @@ class WebFViewController implements WidgetsBindingObserver {
     malloc.free(pointer);
   }
 
-  RenderBox getRootRenderObject() {
-    return document.documentElement!.renderer!;
+  RenderBox? getRootRenderObject() {
+    return document.documentElement!.renderer;
   }
 
   @override
@@ -1127,9 +1127,12 @@ class WebFController {
     return completer.future;
   }
 
-
   bool get shouldBlockingFlushingResolvedStyleProperties {
-    return mode == WebFLoadingMode.preRendering && preRenderingStatus == PreRenderingStatus.evaluate;
+    RenderBox? rootRenderObject = view.getRootRenderObject();
+
+    if (rootRenderObject == null || !rootRenderObject.attached) return true;
+
+    return mode == WebFLoadingMode.preRendering && preRenderingStatus.index < PreRenderingStatus.done.index;
   }
 
   PreRenderingStatus _preRenderingStatus = PreRenderingStatus.none;
@@ -1170,8 +1173,7 @@ class WebFController {
       module.initialize()
     ]);
 
-    // Stop the timer and animation frame
-    module.pauseTimer();
+    // Stop the animation frame
     module.pauseAnimationFrame();
 
     // Pause the animation timeline.
@@ -1190,6 +1192,11 @@ class WebFController {
       _preRenderingStatus = PreRenderingStatus.evaluate;
 
       await evaluateEntrypoint();
+
+      _preRenderingStatus = PreRenderingStatus.done;
+
+      flushUICommand(view);
+
     } else if (_entrypoint!.isHTML) {
       // Evaluate the HTML entry point, and loading the stylesheets and scripts.
       await evaluateEntrypoint();
@@ -1208,6 +1215,8 @@ class WebFController {
         }
 
         _preRenderingStatus = PreRenderingStatus.done;
+
+        flushUICommand(view);
 
         completer.complete();
       };
@@ -1245,6 +1254,8 @@ class WebFController {
   void pause() {
     _paused = true;
     module.pauseTimer();
+    module.pauseAnimationFrame();
+    view.stopAnimationsTimeLine();
   }
 
   // Resume all timers and callbacks if kraken page now visible.
@@ -1252,6 +1263,8 @@ class WebFController {
     _paused = false;
     flushPendingCallbacks();
     module.resumeTimer();
+    module.resumeAnimationFrame();
+    view.resumeAnimationTimeline();
   }
 
   bool _disposed = false;
