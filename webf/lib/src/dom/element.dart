@@ -628,7 +628,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
       // Remove fixed children from root when element disposed.
       if (ownerDocument.viewport != null && renderStyle.position == CSSPositionType.fixed) {
-        _removeFixedChild(renderBoxModel, ownerDocument.viewport!);
+        _removeFixedChild(renderBoxModel, ownerDocument);
       }
       // Remove renderBox.
       renderBoxModel.detachFromContainingBlock();
@@ -674,10 +674,9 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   /// Normally element in scroll box will not repaint on scroll because of repaint boundary optimization
   /// So it needs to manually mark element needs paint and add scroll offset in paint stage
   void _applyFixedChildrenOffset(double scrollOffset, AxisDirection axisDirection) {
-    RenderViewportBox? viewport = ownerDocument.viewport;
     // Only root element has fixed children.
-    if (this == ownerDocument.documentElement && viewport != null) {
-      for (RenderBoxModel child in viewport.fixedChildren) {
+    if (this == ownerDocument.documentElement) {
+      for (RenderBoxModel child in ownerDocument.fixedChildren) {
         // Save scrolling offset for paint
         if (axisDirection == AxisDirection.down) {
           child.scrollingOffsetY = scrollOffset;
@@ -779,7 +778,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
       RenderBoxModel _renderBoxModel = renderBoxModel!;
       // Remove fixed children before convert to non repaint boundary renderObject
       if (currentPosition != CSSPositionType.fixed) {
-        _removeFixedChild(_renderBoxModel, ownerDocument.viewport!);
+        _removeFixedChild(_renderBoxModel, ownerDocument);
       }
 
       // Find the renderBox of its containing block.
@@ -789,7 +788,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
       // // If previousSibling is a renderBox than represent a fixed element. Should skipped it util reach a renderBox in normal layout tree.
       while (previousSibling != null &&
-          _isRenderBoxFixed(previousSibling, ownerDocument.viewport!) &&
+          _isRenderBoxFixed(previousSibling, ownerDocument) &&
           previousSibling is RenderBoxModel) {
         previousSibling = previousSibling.getPreviousSibling(followPlaceHolder: false);
       }
@@ -807,7 +806,7 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
       // Add fixed children after convert to repaint boundary renderObject.
       if (currentPosition == CSSPositionType.fixed) {
-        _addFixedChild(renderBoxModel!, ownerDocument.viewport!);
+        _addFixedChild(renderBoxModel!, ownerDocument);
       }
     }
 
@@ -991,8 +990,10 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
         markAfterPseudoElementNeedsUpdate();
       }
 
-      // Flush pending style before child attached.
-      style.flushPendingProperties();
+      if (!ownerDocument.controller.shouldBlockingFlushingResolvedStyleProperties) {
+        // Flush pending style before child attached.
+        style.flushPendingProperties();
+      }
 
       didAttachRenderer();
     }
@@ -1838,13 +1839,21 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
 
   void _onStyleFlushed(List<String> properties) {
     if (renderStyle.shouldAnimation(properties)) {
-      renderStyle.beforeRunningAnimation();
-      if (renderBoxModel!.hasSize) {
-        renderStyle.runAnimation();
-      } else {
-        SchedulerBinding.instance.addPostFrameCallback((callback) {
+      runAnimation() {
+        renderStyle.beforeRunningAnimation();
+        if (renderBoxModel!.hasSize) {
           renderStyle.runAnimation();
-        });
+        } else {
+          SchedulerBinding.instance.addPostFrameCallback((callback) {
+            renderStyle.runAnimation();
+          });
+        }
+      }
+
+      if (ownerDocument.ownerView.isAnimationTimelineStopped) {
+        ownerDocument.ownerView.addPendingAnimationTimeline(runAnimation);
+      } else {
+        runAnimation();
       }
     }
   }
@@ -1905,7 +1914,9 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
       var hasInheritedPendingProperty = false;
       if (style.merge(newStyle)) {
         hasInheritedPendingProperty = style.hasInheritedPendingProperty;
-        style.flushPendingProperties();
+        if (!ownerDocument.controller.shouldBlockingFlushingResolvedStyleProperties) {
+          style.flushPendingProperties();
+        }
       }
 
       if (rebuildNested || hasInheritedPendingProperty) {
@@ -1921,7 +1932,9 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
     inlineStyle.forEach((String property, _) {
       _removeInlineStyleProperty(property);
     });
-    style.flushPendingProperties();
+    if (!ownerDocument.controller.shouldBlockingFlushingResolvedStyleProperties) {
+      style.flushPendingProperties();
+    }
   }
 
   void _removeInlineStyleProperty(String property) {
@@ -2144,23 +2157,23 @@ Element? _findContainingBlock(Element child, Element viewportElement) {
 }
 
 // Cache fixed renderObject to root element
-void _addFixedChild(RenderBoxModel childRenderBoxModel, RenderViewportBox viewport) {
-  Set<RenderBoxModel> fixedChildren = viewport.fixedChildren;
+void _addFixedChild(RenderBoxModel childRenderBoxModel, Document ownerDocument) {
+  Set<RenderBoxModel> fixedChildren = ownerDocument.fixedChildren;
   if (!fixedChildren.contains(childRenderBoxModel)) {
     fixedChildren.add(childRenderBoxModel);
   }
 }
 
 // Remove non fixed renderObject from root element
-void _removeFixedChild(RenderBoxModel childRenderBoxModel, RenderViewportBox viewport) {
-  Set<RenderBoxModel> fixedChildren = viewport.fixedChildren;
+void _removeFixedChild(RenderBoxModel childRenderBoxModel, Document ownerDocument) {
+  Set<RenderBoxModel> fixedChildren = ownerDocument.fixedChildren;
   if (fixedChildren.contains(childRenderBoxModel)) {
     fixedChildren.remove(childRenderBoxModel);
   }
 }
 
-bool _isRenderBoxFixed(RenderBox renderBox, RenderViewportBox viewport) {
-  Set<RenderBoxModel> fixedChildren = viewport.fixedChildren;
+bool _isRenderBoxFixed(RenderBox renderBox, Document ownerDocument) {
+  Set<RenderBoxModel> fixedChildren = ownerDocument.fixedChildren;
   return fixedChildren.contains(renderBox);
 }
 

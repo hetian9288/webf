@@ -98,6 +98,7 @@ abstract class WebFBundle {
 
   // Indicate the bundle is resolved.
   bool get isResolved => _uri != null;
+  bool get isDataObtained => data != null;
 
   // Content type for data.
   // The default value is plain text.
