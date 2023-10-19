@@ -655,7 +655,7 @@ class WebFViewController implements WidgetsBindingObserver {
   }
 
   RenderBox? getRootRenderObject() {
-    return document.documentElement!.renderer;
+    return document.documentElement?.renderer;
   }
 
   @override
