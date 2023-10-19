@@ -54,7 +54,8 @@ WEBF_EXPORT_C
 int8_t evaluateQuickjsByteCode(void* page, uint8_t* bytes, int32_t byteLen);
 
 WEBF_EXPORT_C
-void dumpQuickjsByteCode(void* page, const char* code,
+void dumpQuickjsByteCode(void* page,
+                         const char* code,
                          int32_t code_len,
                          uint8_t** parsed_bytecodes,
                          uint64_t* bytecode_len,
