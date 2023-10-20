@@ -234,7 +234,7 @@ class WebFRenderSliverList extends RenderSliverMultiBoxAdaptor {
             return false;
           }
         } else {
-          RenderBox realChild = (child as RenderSliverRepaintProxy).child as RenderBox;
+          RenderBox? realChild = (child as RenderSliverRepaintProxy).child;
           // Layout the child.
           if ((realChild is RenderTextBox && realChild.needsLayout) || (realChild is RenderBoxModel && realChild.needsLayout)) {
             child!.layout(childConstraints, parentUsesSize: true);
