@@ -118,6 +118,10 @@ class BindingObject : public ScriptWrappable {
     if (native_binding_object == nullptr)
       return nullptr;
 
+    if (native_binding_object->disposed_) {
+      return nullptr;
+    }
+
     return native_binding_object->binding_target_;
   };
 
