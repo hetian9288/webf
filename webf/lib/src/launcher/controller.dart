@@ -179,8 +179,8 @@ class WebFViewController implements WidgetsBindingObserver {
       this.navigationDelegate,
       this.gestureListener,
       this.initialCookies,
-      // Viewport won't change when kraken page reload, should reuse previous page's viewportBox.
-      RenderViewportBox? originalViewport}) {
+      this.viewport
+      }) {
     if (enableDebug) {
       debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
       debugPaintSizeEnabled = true;
@@ -870,6 +870,9 @@ class WebFController {
   // The kraken view entrypoint bundle.
   WebFBundle? _entrypoint;
   WebFBundle? get entrypoint => _entrypoint;
+  set entrypoint(WebFBundle? value) {
+    _entrypoint = value;
+  }
 
   bool externalController;
 
@@ -990,7 +993,7 @@ class WebFController {
           rootController: this,
           navigationDelegate: _view.navigationDelegate,
           gestureListener: _view.gestureListener,
-          originalViewport: _view.viewport);
+          viewport: _view.viewport);
 
       _module = WebFModuleController(this, _view.contextId);
 
@@ -1042,6 +1045,14 @@ class WebFController {
     _isComplete = false;
 
     await unload();
+
+    // Sync element state.
+    flushUICommand(_view);
+    // Sync viewport size to the documentElement.
+    _view.document.initializeRootElementSize();
+    // Starting to flush ui commands every frames.
+    _view.flushPendingCommandsPerFrame();
+
     await executeEntrypoint();
 
     if (devToolsService != null) {
@@ -1052,21 +1063,16 @@ class WebFController {
   Future<void> load(WebFBundle bundle) async {
     assert(!_view._disposed, 'WebF have already disposed');
 
-    if (devToolsService != null) {
-      devToolsService!.willReload();
-    }
-
-    await unload();
+    mode = WebFLoadingMode.standard;
 
     // Update entrypoint.
     _entrypoint = bundle;
     _addHistory(bundle);
 
-    await executeEntrypoint();
+    // Initialize document, window and the documentElement.
+    flushUICommand(view);
 
-    if (devToolsService != null) {
-      devToolsService!.didReload();
-    }
+    await executeEntrypoint();
   }
 
   PreloadingStatus _preloadStatus = PreloadingStatus.none;
@@ -1113,7 +1119,7 @@ class WebFController {
       completer.complete();
     } else if (_entrypoint!.isHTML) {
       // Evaluate the HTML entry point, and loading the stylesheets and scripts.
-      await evaluateEntrypoint();;
+      await evaluateEntrypoint();
 
       // Initialize document, window and the documentElement.
       flushUICommand(view);

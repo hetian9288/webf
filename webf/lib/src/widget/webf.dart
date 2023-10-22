@@ -414,58 +414,63 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
   void mount(Element? parent, Object? newSlot) async {
     super.mount(parent, newSlot);
     assert(parent is WebFContextInheritElement);
-    assert(controller != null);
+    assert(this.controller != null);
+    WebFController controller = this.controller!;
     (parent as WebFContextInheritElement).controller = controller;
 
-    if (controller!.entrypoint == null) {
+    if (controller.entrypoint == null) {
       throw FlutterError('Consider providing a WebFBundle resource as the entry point for WebF');
     }
 
     RenderViewportBox rootRenderObject = renderObject as RenderViewportBox;
-    if (!controller!.view.firstLoad) {
-      rootRenderObject.insert(controller!.view.getRootRenderObject()!);
-      controller!.resume();
+    if (!controller.view.firstLoad) {
+      rootRenderObject.insert(controller.view.getRootRenderObject()!);
+      controller.resume();
     }
 
     // Sync element state.
-    flushUICommand(controller!.view);
+    flushUICommand(controller.view);
+
+    print(controller.entrypoint!.url);
 
     // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
     try {
       SchedulerBinding.instance.addPostFrameCallback((_) async {
-        if (controller!.evaluated) return;
+        if (controller.evaluated) {
+          return;
+        }
         // Sync viewport size to the documentElement.
-        controller!.view.document.initializeRootElementSize();
+        controller.view.document.initializeRootElementSize();
         // Starting to flush ui commands every frames.
-        controller!.view.flushPendingCommandsPerFrame();
+        controller.view.flushPendingCommandsPerFrame();
 
         // Bundle could be executed before mount to the flutter tree.
-        if (controller!.mode == WebFLoadingMode.standard) {
-          await controller!.executeEntrypoint(animationController: widget._webfWidget.animationController);
-        } else if (controller!.mode == WebFLoadingMode.preloading) {
-          assert(controller!.entrypoint!.isResolved);
-          assert(controller!.entrypoint!.isDataObtained);
-          if (controller!.view.document.unfinishedPreloadResources == 0 && controller!.entrypoint!.isHTML) {
-            List<VoidCallback> pendingScriptCallbacks = controller!.view.document.pendingPreloadingScriptCallbacks;
+        if (controller.mode == WebFLoadingMode.standard) {
+          await controller.executeEntrypoint(animationController: widget._webfWidget.animationController);
+        } else if (controller.mode == WebFLoadingMode.preloading) {
+          assert(controller.entrypoint!.isResolved);
+          assert(controller.entrypoint!.isDataObtained);
+          if (controller.view.document.unfinishedPreloadResources == 0 && controller.entrypoint!.isHTML) {
+            List<VoidCallback> pendingScriptCallbacks = controller.view.document.pendingPreloadingScriptCallbacks;
             for (int i = 0; i < pendingScriptCallbacks.length; i ++) {
               pendingScriptCallbacks[i]();
             }
-          } else if (controller!.entrypoint!.isJavascript || controller!.entrypoint!.isBytecode) {
-            await controller!.evaluateEntrypoint();
+          } else if (controller.entrypoint!.isJavascript || controller.entrypoint!.isBytecode) {
+            await controller.evaluateEntrypoint();
           }
-        } else if (controller!.mode == WebFLoadingMode.preRendering) {
-          controller!.module.resumeAnimationFrame();
+        } else if (controller.mode == WebFLoadingMode.preRendering) {
+          controller.module.resumeAnimationFrame();
 
-          HTMLElement rootElement = controller!.view.document.documentElement as HTMLElement;
+          HTMLElement rootElement = controller.view.document.documentElement as HTMLElement;
           rootElement.flushPendingStylePropertiesForWholeTree();
 
-          controller!.view.resumeAnimationTimeline();
+          controller.view.resumeAnimationTimeline();
 
-          controller!.dispatchDOMContentLoadedEvent();
-          controller!.dispatchWindowLoadEvent();
+          controller.dispatchDOMContentLoadedEvent();
+          controller.dispatchWindowLoadEvent();
         }
 
-        controller!.evaluated = true;
+        controller.evaluated = true;
       });
     } catch (e, s) {
       print(s);

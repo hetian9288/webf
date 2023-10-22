@@ -134,7 +134,7 @@ class Document extends ContainerNode {
   String get nodeName => '#document';
 
   @override
-  RenderBox? get renderer => viewport;
+  RenderBox? get renderer => disposed ? null : viewport;
 
   // https://github.com/WebKit/WebKit/blob/main/Source/WebCore/dom/Document.h#L770
   bool parsing = false;
