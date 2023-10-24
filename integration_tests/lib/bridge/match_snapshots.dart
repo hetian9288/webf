@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:image_compare/image_compare.dart';
 
 import 'package:image/image.dart';
@@ -139,6 +140,7 @@ bool matchFile(List<int> left, List<int> right) {
 }
 
 Future<bool> matchImageSnapshot(Uint8List bytes, String filename) async {
+  print('$filename');
   final dirname = path.dirname(filename);
   var dir = Directory(dirname);
   if (!dir.existsSync()) {
@@ -169,6 +171,19 @@ Future<bool> matchImageSnapshot(Uint8List bytes, String filename) async {
 
     await snap.writeAsBytes(currentPixels);
     return true;
+  }
+}
+
+tester() {
+
+}
+
+int index = 0;
+
+Future<void> matchImageSnapshotOrError(Uint8List bytes, String filename) async  {
+  bool isMatch = await matchImageSnapshot(bytes, 'widget_specs/' + filename + '.${(index++).toString()}.png');
+  if (!isMatch) {
+    throw FlutterError('The image path: $filename is not match');
   }
 }
 
