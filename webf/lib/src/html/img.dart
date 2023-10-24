@@ -606,7 +606,8 @@ class ImageElement extends Element {
     String base = ownerDocument.controller.url;
     try {
       _resolvedUri = ownerDocument.controller.uriParser!.resolve(Uri.parse(base), Uri.parse(src));
-    } catch (_) {
+    } catch (e, stack) {
+      print('$e, $stack');
       // Ignoring the failure of resolving, but to remove the resolved hyperlink.
       _resolvedUri = null;
     }

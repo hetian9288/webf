@@ -129,6 +129,14 @@ abstract class WebFBundle {
 
   Future<void> obtainData();
 
+  @override
+  int get hashCode => Object.hash(url, data);
+
+  @override
+  bool operator==(Object other) {
+    return hashCode == other.hashCode;
+  }
+
   // Dispose the memory obtained by bundle.
   @mustCallSuper
   void dispose() {

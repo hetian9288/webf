@@ -373,6 +373,10 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
       onControllerCreated(controller);
     }
 
+    if (controller.entrypoint != _webfWidget.bundle && _webfWidget.bundle != null) {
+      controller.entrypoint = _webfWidget.bundle;
+    }
+
     RenderViewportBox root = RenderViewportBox(
         background: _webfWidget.background,
         viewportSize: (_webfWidget.viewportWidth != null && _webfWidget.viewportHeight != null)
@@ -411,6 +415,17 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
   WebFController? controller;
 
   @override
+  void unmount() {
+    super.unmount();
+    if (controller?.externalController == true) {
+      controller?.pause();
+    } else {
+      controller?.dispose();
+    }
+    controller = null;
+  }
+
+  @override
   void mount(Element? parent, Object? newSlot) async {
     super.mount(parent, newSlot);
     assert(parent is WebFContextInheritElement);
@@ -422,6 +437,10 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
       throw FlutterError('Consider providing a WebFBundle resource as the entry point for WebF');
     }
 
+    if (controller.mode == WebFLoadingMode.standard && controller.mountedAndEvaluated && controller.entrypointChanged) {
+      await controller.unload();
+    }
+
     RenderViewportBox rootRenderObject = renderObject as RenderViewportBox;
     if (!controller.view.firstLoad) {
       rootRenderObject.insert(controller.view.getRootRenderObject()!);
@@ -431,12 +450,10 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
     // Sync element state.
     flushUICommand(controller.view);
 
-    print(controller.entrypoint!.url);
-
     // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
     try {
       SchedulerBinding.instance.addPostFrameCallback((_) async {
-        if (controller.evaluated) {
+        if (controller.mountedAndEvaluated) {
           return;
         }
         // Sync viewport size to the documentElement.
@@ -470,22 +487,11 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
           controller.dispatchWindowLoadEvent();
         }
 
-        controller.evaluated = true;
+        controller.mountedAndEvaluated = true;
       });
     } catch (e, s) {
       print(s);
     }
-  }
-
-  @override
-  void unmount() {
-    super.unmount();
-    if (controller?.externalController == true) {
-      controller?.pause();
-    } else {
-      controller?.dispose();
-    }
-    controller = null;
   }
 
   // RenderObjects created by webf are manager by webf itself. There are no needs to operate renderObjects on _WebFRenderObjectElement.

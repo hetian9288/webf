@@ -871,10 +871,22 @@ class WebFController {
   WebFBundle? _entrypoint;
   WebFBundle? get entrypoint => _entrypoint;
   set entrypoint(WebFBundle? value) {
+    if (value == null) return;
+
+    if (_entrypoint != null && _entrypoint != value) {
+      _entrypointChanged = true;
+    }
     _entrypoint = value;
+
+    _addHistory(value);
   }
 
+  bool _entrypointChanged = false;
+  bool get entrypointChanged => _entrypointChanged;
+
   bool externalController;
+
+  late WebFViewController _view;
 
   WebFController(
     BuildContext context, {
@@ -903,7 +915,6 @@ class WebFController {
     this.externalController = true,
     this.resizeToAvoidBottomInsets = true,
   })  : _name = name,
-        _entrypoint = bundle,
         _gestureListener = gestureListener,
         ownerFlutterView = View.of(context) {
     _initializePreloadBundle();
@@ -922,11 +933,7 @@ class WebFController {
     final int contextId = _view.contextId;
 
     _module = WebFModuleController(this, contextId);
-
-    if (bundle != null) {
-      HistoryModule historyModule = module.moduleManager.getModule<HistoryModule>('History')!;
-      historyModule.add(bundle);
-    }
+    entrypoint = bundle;
 
     assert(!_controllerMap.containsKey(contextId), 'found exist contextId of WebFController, contextId: $contextId');
     _controllerMap[contextId] = this;
@@ -943,8 +950,6 @@ class WebFController {
       devToolsService!.init(this);
     }
   }
-
-  late WebFViewController _view;
 
   WebFViewController get view {
     return _view;
@@ -1004,6 +1009,9 @@ class WebFController {
         _nameIdMap[name!] = _view.contextId;
       }
 
+      _entrypointChanged = false;
+      mountedAndEvaluated = false;
+
       completer.complete();
     });
 
@@ -1026,12 +1034,6 @@ class WebFController {
 
   _addHistory(WebFBundle bundle) {
     HistoryModule historyModule = module.moduleManager.getModule<HistoryModule>('History')!;
-    historyModule.add(bundle);
-  }
-
-  void _replaceCurrentHistory(WebFBundle bundle) {
-    HistoryModule historyModule = module.moduleManager.getModule<HistoryModule>('History')!;
-    previousHistoryStack.clear();
     historyModule.add(bundle);
   }
 
@@ -1090,8 +1092,7 @@ class WebFController {
     Completer completer = Completer();
 
     // Update entrypoint.
-    _entrypoint = bundle;
-    _replaceCurrentHistory(bundle);
+    entrypoint = bundle;
 
     mode = WebFLoadingMode.preloading;
 
@@ -1157,8 +1158,7 @@ class WebFController {
     Completer completer = Completer();
 
     // Update entrypoint.
-    _entrypoint = bundle;
-    _replaceCurrentHistory(bundle);
+    entrypoint = bundle;
 
     mode = WebFLoadingMode.preRendering;
 
@@ -1398,10 +1398,10 @@ class WebFController {
   bool _isComplete = false;
   bool get isComplete => _isComplete;
 
-  bool _evaluated = false;
-  bool get evaluated => _evaluated;
-  set evaluated(value) {
-    _evaluated = value;
+  bool _mountedAndEvaluated = false;
+  bool get mountedAndEvaluated => _mountedAndEvaluated;
+  set mountedAndEvaluated(value) {
+    _mountedAndEvaluated = value;
   }
 
   // https://github.com/WebKit/WebKit/blob/main/Source/WebCore/loader/FrameLoader.cpp#L840
