@@ -1079,6 +1079,7 @@ class WebFController {
 
   PreloadingStatus _preloadStatus = PreloadingStatus.none;
   PreloadingStatus get preloadStatus => _preloadStatus;
+  final Completer<void> preloadCompleter = Completer();
   /// Preloads remote resources into memory and begins execution when the WebF widget is mounted into the Flutter tree.
   /// If the entrypoint is an HTML file, the HTML will be parsed, and its elements will be organized into a DOM tree.
   /// CSS files loaded through `<style>` and `<link>` elements will be parsed and the calculated styles applied to the corresponding DOM elements.
@@ -1088,8 +1089,6 @@ class WebFController {
   /// It's safe and recommended to use this mode for all types of pages.
   Future<void> preload(WebFBundle bundle, {ui.Size? viewportSize}) async {
     if (_preloadStatus != PreloadingStatus.none) return;
-
-    Completer completer = Completer();
 
     // Update entrypoint.
     entrypoint = bundle;
@@ -1117,7 +1116,7 @@ class WebFController {
       if (_entrypoint!.isJavascript) {
         _entrypoint!.preProcessing(view.contextId);
       }
-      completer.complete();
+      preloadCompleter.complete();
     } else if (_entrypoint!.isHTML) {
       // Evaluate the HTML entry point, and loading the stylesheets and scripts.
       await evaluateEntrypoint();
@@ -1127,11 +1126,11 @@ class WebFController {
 
       view.document.onPreloadingFinished = () {
         _preloadStatus = PreloadingStatus.done;
-        completer.complete();
+        preloadCompleter.complete();
       };
     }
 
-    return completer.future;
+    return preloadCompleter.future;
   }
 
   bool get shouldBlockingFlushingResolvedStyleProperties {

@@ -466,6 +466,11 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
           await controller.executeEntrypoint(animationController: widget._webfWidget.animationController);
         } else if (controller.mode == WebFLoadingMode.preloading) {
           assert(controller.entrypoint!.isResolved);
+          // Mount when preloading not complete
+          if (controller.preloadStatus != PreloadingStatus.done) {
+            await controller.preloadCompleter.future;
+          }
+
           assert(controller.entrypoint!.isDataObtained);
           if (controller.view.document.unfinishedPreloadResources == 0 && controller.entrypoint!.isHTML) {
             List<VoidCallback> pendingScriptCallbacks = controller.view.document.pendingPreloadingScriptCallbacks;
