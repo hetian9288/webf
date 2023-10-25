@@ -222,6 +222,10 @@ class WebFViewController implements WidgetsBindingObserver {
     return targetId;
   }
 
+  void disposeTargetIdToDevNodeIdMap(BindingObject? object) {
+    _targetIdToDevNodeIdMap.remove(object?.pointer?.address);
+  }
+
   int forDevtoolsNodeId(BindingObject object) {
     int? nativeAddress = object.pointer?.address;
     if (nativeAddress != null) {
@@ -648,8 +652,8 @@ class WebFViewController implements WidgetsBindingObserver {
     BindingObject? bindingObject = getBindingObject(pointer);
     bindingObject?.dispose();
     view.removeBindingObject(pointer);
+    view.disposeTargetIdToDevNodeIdMap(bindingObject);
     malloc.free(pointer);
-    BindingObject.disposeTargetIdToDevNodeIdMap();
   }
 
   RenderObject getRootRenderObject() {
