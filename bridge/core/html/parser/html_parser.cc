@@ -5,12 +5,12 @@
 
 #include <utility>
 
-#include "core/dom/comment.h"
 #include "core/dom/document.h"
 #include "core/dom/element.h"
 #include "core/dom/text.h"
 #include "element_namespace_uris.h"
 #include "foundation/logging.h"
+#include "html_names.h"
 #include "html_parser.h"
 
 namespace webf {
@@ -22,7 +22,7 @@ std::string trim(const std::string& str) {
   return tmp;
 }
 
-// Parse html,isHTMLFragment should be false if need to automatically complete html, head, and body when they are
+// Parse html,isHTMLFragment should be false if you need to automatically complete html, head, and body when they are
 // missing.
 GumboOutput* parse(const std::string& html, bool isHTMLFragment = false) {
   // Gumbo-parser parse HTML.
@@ -57,6 +57,11 @@ GumboOutput* parse(const std::string& html, bool isHTMLFragment = false) {
 void HTMLParser::traverseHTML(Node* root_node, GumboNode* node) {
   auto* context = root_node->GetExecutingContext();
   JSContext* ctx = root_node->GetExecutingContext()->ctx();
+
+  auto* html_element = DynamicTo<Element>(root_node);
+  if (html_element != nullptr && html_element->localName() == html_names::khtml) {
+    parseProperty(html_element, &node->v.element);
+  }
 
   const GumboVector* children = &node->v.element.children;
   for (int i = 0; i < children->length; ++i) {
@@ -93,23 +98,6 @@ void HTMLParser::traverseHTML(Node* root_node, GumboNode* node) {
       } else if (child->type == GUMBO_NODE_TEXT) {
         auto* text = context->document()->createTextNode(AtomicString(ctx, child->v.text.text), ASSERT_NO_EXCEPTION());
         root_container->AppendChild(text);
-      } else if (child->type == GUMBO_NODE_WHITESPACE) {
-        bool isBlankSpace = true;
-        int nLen = strlen(child->v.text.text);
-        for (int j = 0; j < nLen; ++j) {
-          isBlankSpace = child->v.text.text[j] == ' ';
-          if (!isBlankSpace) {
-            break;
-          }
-        }
-
-        if (isBlankSpace) {
-          if (nLen > 0) {
-            auto* textNode =
-                context->document()->createTextNode(AtomicString(ctx, child->v.text.text), ASSERT_NO_EXCEPTION());
-            root_container->appendChild(textNode, ASSERT_NO_EXCEPTION());
-          }
-        }
       }
     }
   }

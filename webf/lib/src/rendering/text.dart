@@ -61,7 +61,7 @@ class RenderTextBox extends RenderBox with RenderObjectWithChildMixin<RenderBox>
       // pre-wrap  Preserve  Preserve  Wrap     Hang
       // pre-line  Preserve  Collapse  Wrap     Remove
       // break-spaces  Preserve  Preserve  Wrap  Wrap
-      CSSRenderStyle parentRenderStyle = (parent as RenderLayoutBox).renderStyle;
+      CSSRenderStyle parentRenderStyle = (parent as RenderBoxModel).renderStyle;
       WhiteSpace whiteSpace = parentRenderStyle.whiteSpace;
       if (whiteSpace == WhiteSpace.pre ||
           whiteSpace == WhiteSpace.preLine ||
@@ -315,13 +315,7 @@ class RenderTextBox extends RenderBox with RenderObjectWithChildMixin<RenderBox>
 
   // '   a b c' => 'a b c'
   static String _trimLeftWhitespace(String string) {
-    String result = string.replaceAllMapped(_trimLeftWhitespaceReg, (Match m) =>
-    '${m[1]}'
-    );
-    if (result.startsWith(' ')) {
-      return '';
-    }
-    return result;
+    return string.replaceAllMapped(_trimLeftWhitespaceReg, (Match m) => '${m[1]}');
   }
 
   // 'a b c    ' => 'a b c'
