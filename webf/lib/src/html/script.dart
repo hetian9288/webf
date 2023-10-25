@@ -153,7 +153,8 @@ class ScriptRunner {
     }
 
     WebFLoadingMode loadingMode = _document.controller.mode;
-    if (loadingMode != WebFLoadingMode.preloading) {
+
+    call() {
       // Script executing phrase.
       if (shouldAsync) {
         SchedulerBinding.instance.scheduleFrameCallback((_) async {
@@ -166,10 +167,14 @@ class ScriptRunner {
           }
         });
       }
+    }
+
+
+    if (loadingMode != WebFLoadingMode.preloading) {
+      call();
     } else {
       bundle.preProcessing(_contextId);
-      _document.pendingPreloadingScriptCallbacks.add(() => task(shouldAsync));
-
+      _document.pendingPreloadingScriptCallbacks.add(call);
       if (_document.controller.preloadStatus != PreloadingStatus.none) {
         _document.unfinishedPreloadResources--;
         if (_document.unfinishedPreloadResources == 0 && _document.onPreloadingFinished != null) {
