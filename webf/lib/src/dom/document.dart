@@ -369,6 +369,9 @@ class Document extends ContainerNode {
     }
 
     _documentElement = element;
+    if (_documentElement != null && viewport?.hasSize == true) {
+      initializeRootElementSize();
+    }
   }
 
   void initializeRootElementSize() {
