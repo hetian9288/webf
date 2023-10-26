@@ -67,6 +67,9 @@ class FirstRouteElement extends StatefulElement {
 
       Navigator.pop(this);
 
+      await sleep(Duration(milliseconds: 500));
+
+      exit(0);
     } catch (e, stack) {
       print('$e \n $stack');
       exit(1);

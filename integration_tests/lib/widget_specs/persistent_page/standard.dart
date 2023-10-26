@@ -11,6 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:webf/webf.dart';
 import 'package:webf_integration_tests/bridge/match_snapshots.dart';
 import '../../utils/sleep.dart';
+import 'package:stack_trace/stack_trace.dart' as stacktrace;
+
+/// Returns an absolute path to the caller's `.dart` file.
+String currentDartFilePath() => stacktrace.Frame.caller(1).uri.path.split('/').sublist(2).join('/');
 
 void main() {
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -46,7 +50,7 @@ class FirstRouteElement extends StatefulElement {
       );
       await sleep(Duration(seconds: 1));
       Uint8List snapshotBytes = await state.controller.view.document.documentElement!.toBlob();
-      await matchImageSnapshotOrError(snapshotBytes, 'widget_specs/persistent_page/standard.dart');
+      await matchImageSnapshotOrError(snapshotBytes, currentDartFilePath());
 
       Navigator.pop(this);
       await sleep(Duration(seconds: 1));
@@ -57,9 +61,12 @@ class FirstRouteElement extends StatefulElement {
 
       await sleep(Duration(seconds: 1));
       Uint8List snapshotBytes2 = await state.controller.view.document.documentElement!.toBlob();
-      await matchImageSnapshotOrError(snapshotBytes2, 'widget_specs/persistent_page/standard.dart.2');
+      await matchImageSnapshotOrError(snapshotBytes2, currentDartFilePath());
 
       Navigator.pop(this);
+
+      await sleep(Duration(seconds: 1));
+      exit(0);
 
     } catch (e, stack) {
       print('$e \n $stack');
