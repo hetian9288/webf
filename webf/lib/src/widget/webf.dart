@@ -472,6 +472,10 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
           }
 
           assert(controller.entrypoint!.isDataObtained);
+
+          HTMLElement rootElement = controller.view.document.documentElement as HTMLElement;
+          rootElement.flushPendingStylePropertiesForWholeTree();
+
           if (controller.view.document.unfinishedPreloadResources == 0 && controller.entrypoint!.isHTML) {
             List<VoidCallback> pendingScriptCallbacks = controller.view.document.pendingPreloadingScriptCallbacks;
             for (int i = 0; i < pendingScriptCallbacks.length; i ++) {

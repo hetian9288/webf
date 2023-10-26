@@ -1124,6 +1124,11 @@ class WebFController {
       // Initialize document, window and the documentElement.
       flushUICommand(view);
 
+      if (view.document.unfinishedPreloadResources == 0) {
+        preloadCompleter.complete();
+        return;
+      }
+
       view.document.onPreloadingFinished = () {
         _preloadStatus = PreloadingStatus.done;
         preloadCompleter.complete();
