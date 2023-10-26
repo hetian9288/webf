@@ -19,7 +19,7 @@ String currentDartFilePath() => stacktrace.Frame.caller(1).uri.path.split('/').s
 void main() {
   FlutterError.onError = (FlutterErrorDetails details) {
     print('=================== CAUGHT FLUTTER ERROR');
-    // exit(1);
+    exit(1);
   };
   runZonedGuarded(() async {
     runApp(MaterialApp(home: FirstRoute(),));
@@ -28,7 +28,7 @@ void main() {
     print('--------------------------------');
     print('Error :  $error');
     print('StackTrace :  $stackTrace');
-    // exit(1);
+    exit(1);
   });
 }
 

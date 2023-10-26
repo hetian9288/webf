@@ -98,7 +98,7 @@ class FirstRouteState extends State<FirstRoute> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     controller = WebFController(context);
-    controller.preload(WebFBundle.fromUrl('assets:///assets/demo_app/bundle.html'));
+    controller.preRendering(WebFBundle.fromUrl('assets:///assets/demo_app/bundle.html'));
   }
 
   @override
