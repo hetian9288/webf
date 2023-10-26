@@ -69,7 +69,7 @@ class FirstRouteElement extends StatefulElement {
 
     } catch (e, stack) {
       print('$e \n $stack');
-      // exit(1);
+      exit(1);
     }
   }
 }
@@ -131,12 +131,8 @@ class SecondRoute extends StatelessWidget {
         body: Center(
           // Center is a layout widget. It takes a single child and positions it
           // in the middle of the parent.
-          child: Column(
-            children: [
-              WebF(
-                controller: controller,
-              ),
-            ],
+          child: WebF(
+            controller: controller,
           ),
         ));
   }
