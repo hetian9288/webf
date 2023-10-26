@@ -135,7 +135,6 @@ bool ExecutingContext::EvaluateJavaScript(const char* code,
     *bytecode_len = len;
 
     result = JS_EvalFunction(script_state_.ctx(), byte_object);
-    JS_FreeValue(ctx(), byte_object);
   }
 
   DrainPendingPromiseJobs();
