@@ -481,6 +481,11 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
             await controller.evaluateEntrypoint();
           }
         } else if (controller.mode == WebFLoadingMode.preRendering) {
+          // Mount when preloading not complete
+          if (controller.preRenderingStatus != PreRenderingStatus.done) {
+            await controller.preRenderingCompleter.future;
+          }
+
           controller.module.resumeAnimationFrame();
 
           HTMLElement rootElement = controller.view.document.documentElement as HTMLElement;

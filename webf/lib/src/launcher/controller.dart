@@ -1143,6 +1143,7 @@ class WebFController {
 
   PreRenderingStatus _preRenderingStatus = PreRenderingStatus.none;
   PreRenderingStatus get preRenderingStatus => _preRenderingStatus;
+  final Completer<void> preRenderingCompleter = Completer();
   /// The `aggressive` mode is a step further than `preloading`, cutting down up to 90% of loading time for optimal performance.
   /// This mode simulates the instantaneous response of native Flutter pages but may require modifications in the existing web codes for compatibility.
   /// In this mode, all remote resources are loaded and executed similarly to the standard mode, but with an offline-like behavior.
@@ -1153,8 +1154,6 @@ class WebFController {
   /// Apps optimized for this mode remain compatible with both `standard` and `preloading` modes.
   Future<void> preRendering(WebFBundle bundle) async {
     if (_preRenderingStatus != PreRenderingStatus.none) return;
-
-    Completer completer = Completer();
 
     // Update entrypoint.
     entrypoint = bundle;
@@ -1191,7 +1190,7 @@ class WebFController {
       }
 
       view.window.addEventListener(EVENT_LOAD, (event) {
-        completer.complete();
+        preRenderingCompleter.complete();
       });
 
       _preRenderingStatus = PreRenderingStatus.evaluate;
@@ -1209,6 +1208,11 @@ class WebFController {
       // Initialize document, window and the documentElement.
       flushUICommand(view);
 
+      if (view.document.unfinishedPreloadResources == 0) {
+        preRenderingCompleter.complete();
+        return;
+      }
+
       view.document.onPreloadingFinished = () async {
         _preRenderingStatus = PreRenderingStatus.evaluate;
 
@@ -1223,11 +1227,11 @@ class WebFController {
 
         flushUICommand(view);
 
-        completer.complete();
+        preRenderingCompleter.complete();
       };
     }
 
-    return completer.future;
+    return preRenderingCompleter.future;
   }
 
   String? getResourceContent(String? url) {
