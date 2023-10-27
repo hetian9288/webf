@@ -41,8 +41,8 @@ class ScriptRunner {
   static Future<void> _evaluateScriptBundle(int contextId, WebFBundle bundle, {bool async = false}) async {
     // Evaluate bundle.
     if (bundle.isJavascript) {
-      final String contentInString = await resolveStringFromData(bundle.data!, preferSync: !async);
-      bool result = await evaluateScripts(contextId, contentInString, url: bundle.url);
+      assert(isValidUTF8String(bundle.data!), 'The JavaScript codes should be in UTF-8 encoding format');
+      bool result = await evaluateScripts(contextId, bundle.data!, url: bundle.url);
       if (!result) {
         throw FlutterError('Script code are not valid to evaluate.');
       }
@@ -69,6 +69,11 @@ class ScriptRunner {
     // Increment load event delay count before eval.
     _document.incrementDOMContentLoadedEventDelayCount();
 
+    // Increase the pending count for preloading resources.
+    if (_document.controller.preloadStatus != PreloadingStatus.none) {
+      _document.unfinishedPreloadResources++;
+    }
+
     // Obtain bundle.
     WebFBundle bundle;
 
@@ -80,7 +85,7 @@ class ScriptRunner {
       bundle = WebFBundle.fromContent(scriptCode);
     } else {
       String url = element.src.toString();
-      bundle = WebFBundle.fromUrl(url);
+      bundle = _document.controller.getPreloadBundleFromUrl(url) ?? WebFBundle.fromUrl(url);
     }
 
     element.readyState = ScriptReadyState.interactive;
@@ -121,7 +126,8 @@ class ScriptRunner {
     // Increment count when request.
     _document.incrementDOMContentLoadedEventDelayCount();
     try {
-      await bundle.resolve(_contextId);
+      await bundle.resolve(baseUrl: _document.controller.url, uriParser: _document.controller.uriParser);
+      await bundle.obtainData();
 
       if (!bundle.isResolved) {
         throw FlutterError('Network error.');
@@ -146,18 +152,35 @@ class ScriptRunner {
       _document.decrementDOMContentLoadedEventDelayCount();
     }
 
-    // Script executing phrase.
-    if (shouldAsync) {
-      // @TODO: Use requestIdleCallback
-      SchedulerBinding.instance.scheduleFrameCallback((_) async {
-        await task(shouldAsync);
-      });
+    WebFLoadingMode loadingMode = _document.controller.mode;
+
+    call() {
+      // Script executing phrase.
+      if (shouldAsync) {
+        SchedulerBinding.instance.scheduleFrameCallback((_) async {
+          await task(shouldAsync);
+        });
+      } else {
+        scheduleMicrotask(() {
+          if (_resolvingCount == 0) {
+            _execute(_syncScriptTasks, async: false);
+          }
+        });
+      }
+    }
+
+
+    if (loadingMode != WebFLoadingMode.preloading) {
+      call();
     } else {
-      scheduleMicrotask(() {
-        if (_resolvingCount == 0) {
-          _execute(_syncScriptTasks, async: false);
+      bundle.preProcessing(_contextId);
+      _document.pendingPreloadingScriptCallbacks.add(call);
+      if (_document.controller.preloadStatus != PreloadingStatus.none) {
+        _document.unfinishedPreloadResources--;
+        if (_document.unfinishedPreloadResources == 0 && _document.onPreloadingFinished != null) {
+          _document.onPreloadingFinished!();
         }
-      });
+      }
     }
   }
 }

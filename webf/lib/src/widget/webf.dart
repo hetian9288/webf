@@ -10,9 +10,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:webf/rendering.dart';
 import 'package:webf/webf.dart';
 import 'package:webf/gesture.dart';
-import 'package:webf/css.dart';
 
 typedef OnControllerCreated = void Function(WebFController controller);
 
@@ -51,6 +52,7 @@ class WebF extends StatefulWidget {
   final LoadErrorHandler? onLoadError;
 
   final LoadHandler? onLoad;
+
   // https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event
   final LoadHandler? onDOMContentLoaded;
 
@@ -65,8 +67,14 @@ class WebF extends StatefulWidget {
 
   final UriParser? uriParser;
 
+  /// Remote resources (HTML, CSS, JavaScript, Images, and other content loadable via WebFBundle) can be pre-loaded before WebF is mounted in Flutter.
+  /// Use this property to reduce loading times when a WebF application attempts to load external resources on pages.
+  final List<WebFBundle>? preloadedBundles;
+
   /// The initial cookies to set.
   final List<Cookie>? initialCookies;
+
+  final WebFController? _controller;
 
   /// If true the content should size itself to avoid the onscreen keyboard
   /// whose height is defined by the ambient [FlutterView]'s
@@ -80,7 +88,7 @@ class WebF extends StatefulWidget {
   final bool resizeToAvoidBottomInsets;
 
   WebFController? get controller {
-    return WebFController.getControllerOfName(shortHash(this));
+    return _controller ?? WebFController.getControllerOfName(shortHash(this));
   }
 
   // Set webf http cache mode.
@@ -128,6 +136,8 @@ class WebF extends StatefulWidget {
       this.uriParser,
       this.routeObserver,
       this.initialCookies,
+      this.preloadedBundles,
+      WebFController? controller,
       // webf's viewportWidth options only works fine when viewportWidth is equal to window.physicalSize.width / window.devicePixelRatio.
       // Maybe got unexpected error when change to other values, use this at your own risk!
       // We will fixed this on next version released. (v0.6.0)
@@ -143,7 +153,8 @@ class WebF extends StatefulWidget {
       this.animationController,
       this.onJSError,
       this.resizeToAvoidBottomInsets = true})
-      : super(key: key);
+      : _controller = controller,
+        super(key: key);
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -160,6 +171,7 @@ class WebFState extends State<WebF> with RouteAware {
   bool _disposed = false;
 
   final Set<WebFWidgetElementToWidgetAdapter> customElementWidgets = {};
+
   void onCustomElementWidgetAdd(WebFWidgetElementToWidgetAdapter adapter) {
     Future.microtask(() {
       if (!_disposed) {
@@ -326,28 +338,31 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    double viewportWidth = _webfWidget.viewportWidth ?? window.physicalSize.width / window.devicePixelRatio;
-    double viewportHeight = _webfWidget.viewportHeight ?? window.physicalSize.height / window.devicePixelRatio;
-
-    WebFController controller = WebFController(shortHash(_webfWidget), viewportWidth, viewportHeight,
-        background: _webfWidget.background,
-        entrypoint: _webfWidget.bundle,
-        // Execute entrypoint when mount manually.
-        autoExecuteEntrypoint: false,
-        onLoad: _webfWidget.onLoad,
-        onDOMContentLoaded: _webfWidget.onDOMContentLoaded,
-        onLoadError: _webfWidget.onLoadError,
-        onJSError: _webfWidget.onJSError,
-        methodChannel: _webfWidget.javaScriptChannel,
-        gestureListener: _webfWidget.gestureListener,
-        navigationDelegate: _webfWidget.navigationDelegate,
-        devToolsService: _webfWidget.devToolsService,
-        httpClientInterceptor: _webfWidget.httpClientInterceptor,
-        onCustomElementAttached: onCustomElementAttached,
-        onCustomElementDetached: onCustomElementDetached,
-        initialCookies: _webfWidget.initialCookies,
-        uriParser: _webfWidget.uriParser,
-        resizeToAvoidBottomInsets: resizeToAvoidBottomInsets);
+    WebFController controller = _webfWidget.controller ??
+        WebFController(context,
+            name: shortHash(_webfWidget),
+            viewportWidth: _webfWidget.viewportWidth,
+            viewportHeight: _webfWidget.viewportHeight,
+            background: _webfWidget.background,
+            bundle: _webfWidget.bundle,
+            // Execute entrypoint when mount manually.
+            autoExecuteEntrypoint: false,
+            externalController: false,
+            onLoad: _webfWidget.onLoad,
+            onDOMContentLoaded: _webfWidget.onDOMContentLoaded,
+            onLoadError: _webfWidget.onLoadError,
+            onJSError: _webfWidget.onJSError,
+            methodChannel: _webfWidget.javaScriptChannel,
+            gestureListener: _webfWidget.gestureListener,
+            navigationDelegate: _webfWidget.navigationDelegate,
+            devToolsService: _webfWidget.devToolsService,
+            httpClientInterceptor: _webfWidget.httpClientInterceptor,
+            onCustomElementAttached: onCustomElementAttached,
+            onCustomElementDetached: onCustomElementDetached,
+            initialCookies: _webfWidget.initialCookies,
+            uriParser: _webfWidget.uriParser,
+            preloadedBundles: _webfWidget.preloadedBundles,
+            resizeToAvoidBottomInsets: resizeToAvoidBottomInsets);
 
     (context as _WebFRenderObjectElement).controller = controller;
 
@@ -356,7 +371,19 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
       onControllerCreated(controller);
     }
 
-    return controller.view.getRootRenderObject();
+    if (controller.entrypoint != _webfWidget.bundle && _webfWidget.bundle != null) {
+      controller.entrypoint = _webfWidget.bundle;
+    }
+
+    RenderViewportBox root = RenderViewportBox(
+        background: _webfWidget.background,
+        viewportSize: (_webfWidget.viewportWidth != null && _webfWidget.viewportHeight != null)
+            ? Size(_webfWidget.viewportWidth!, _webfWidget.viewportHeight!)
+            : null,
+        controller: controller);
+    controller.view.viewport = root;
+
+    return root;
   }
 
   @override
@@ -367,23 +394,11 @@ class WebFRootRenderObjectWidget extends MultiChildRenderObjectWidget {
 
     controller.name = shortHash(_webfWidget);
 
-    bool viewportWidthHasChanged = controller.view.viewportWidth != _webfWidget.viewportWidth;
-    bool viewportHeightHasChanged = controller.view.viewportHeight != _webfWidget.viewportHeight;
-
-    double viewportWidth = _webfWidget.viewportWidth ?? window.physicalSize.width / window.devicePixelRatio;
-    double viewportHeight = _webfWidget.viewportHeight ?? window.physicalSize.height / window.devicePixelRatio;
-
-    if (controller.view.document.documentElement == null) return;
-
-    if (viewportWidthHasChanged) {
-      controller.view.viewportWidth = viewportWidth;
-      controller.view.document.documentElement!.renderStyle.width = CSSLengthValue(viewportWidth, CSSLengthType.PX);
-    }
-
-    if (viewportHeightHasChanged) {
-      controller.view.viewportHeight = viewportHeight;
-      controller.view.document.documentElement!.renderStyle.height = CSSLengthValue(viewportHeight, CSSLengthType.PX);
-    }
+    // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      // Sync viewport size to the documentElement.
+      controller.view.document.initializeRootElementSize();
+    });
   }
 
   @override
@@ -398,19 +413,97 @@ class _WebFRenderObjectElement extends MultiChildRenderObjectElement {
   WebFController? controller;
 
   @override
-  void mount(Element? parent, Object? newSlot) async {
-    super.mount(parent, newSlot);
-    assert(parent is WebFContextInheritElement);
-    assert(controller != null);
-    (parent as WebFContextInheritElement).controller = controller;
-    await controller!.executeEntrypoint(animationController: widget._webfWidget.animationController);
+  void unmount() {
+    super.unmount();
+    if (controller?.externalController == true) {
+      controller?.pause();
+    } else {
+      controller?.dispose();
+    }
+    controller = null;
   }
 
   @override
-  void unmount() {
-    super.unmount();
-    controller?.dispose();
-    controller = null;
+  void mount(Element? parent, Object? newSlot) async {
+    super.mount(parent, newSlot);
+    assert(parent is WebFContextInheritElement);
+    assert(this.controller != null);
+    WebFController controller = this.controller!;
+    (parent as WebFContextInheritElement).controller = controller;
+
+    if (controller.entrypoint == null) {
+      throw FlutterError('Consider providing a WebFBundle resource as the entry point for WebF');
+    }
+
+    if (controller.mode == WebFLoadingMode.standard && controller.mountedAndEvaluated && controller.entrypointChanged) {
+      await controller.unload();
+    }
+
+    RenderViewportBox rootRenderObject = renderObject as RenderViewportBox;
+    if (!controller.view.firstLoad) {
+      rootRenderObject.insert(controller.view.getRootRenderObject()!);
+      controller.resume();
+    }
+
+    // Sync element state.
+    flushUICommand(controller.view);
+
+    // Should schedule to the next frame to make sure the RenderViewportBox(WebF's root renderObject) had been layout.
+    try {
+      SchedulerBinding.instance.addPostFrameCallback((_) async {
+        if (controller.mountedAndEvaluated) {
+          return;
+        }
+        // Sync viewport size to the documentElement.
+        controller.view.document.initializeRootElementSize();
+        // Starting to flush ui commands every frames.
+        controller.view.flushPendingCommandsPerFrame();
+
+        // Bundle could be executed before mount to the flutter tree.
+        if (controller.mode == WebFLoadingMode.standard) {
+          await controller.executeEntrypoint(animationController: widget._webfWidget.animationController);
+        } else if (controller.mode == WebFLoadingMode.preloading) {
+          assert(controller.entrypoint!.isResolved);
+          // Mount when preloading not complete
+          if (controller.preloadStatus != PreloadingStatus.done) {
+            await controller.preloadCompleter.future;
+          }
+
+          assert(controller.entrypoint!.isDataObtained);
+
+          HTMLElement rootElement = controller.view.document.documentElement as HTMLElement;
+          rootElement.flushPendingStylePropertiesForWholeTree();
+
+          if (controller.view.document.unfinishedPreloadResources == 0 && controller.entrypoint!.isHTML) {
+            List<VoidCallback> pendingScriptCallbacks = controller.view.document.pendingPreloadingScriptCallbacks;
+            for (int i = 0; i < pendingScriptCallbacks.length; i ++) {
+              pendingScriptCallbacks[i]();
+            }
+          } else if (controller.entrypoint!.isJavascript || controller.entrypoint!.isBytecode) {
+            await controller.evaluateEntrypoint();
+          }
+        } else if (controller.mode == WebFLoadingMode.preRendering) {
+          // Mount when preloading not complete
+          if (controller.preRenderingStatus != PreRenderingStatus.done) {
+            await controller.preRenderingCompleter.future;
+          }
+
+          controller.module.resumeAnimationFrame();
+
+          HTMLElement rootElement = controller.view.document.documentElement as HTMLElement;
+          rootElement.flushPendingStylePropertiesForWholeTree();
+
+          controller.view.resumeAnimationTimeline();
+
+          controller.dispatchDOMContentLoadedEvent();
+          controller.dispatchWindowLoadEvent();
+        }
+
+        controller.mountedAndEvaluated = true;
+      });
+    } catch (e, s) {
+      print(s);
+    }
   }
 
   // RenderObjects created by webf are manager by webf itself. There are no needs to operate renderObjects on _WebFRenderObjectElement.

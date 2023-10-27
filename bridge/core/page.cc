@@ -97,26 +97,15 @@ NativeValue* WebFPage::invokeModuleEvent(SharedNativeString* native_module_name,
   return return_value;
 }
 
-bool WebFPage::evaluateScript(const SharedNativeString* script,
+bool WebFPage::evaluateScript(const char* script,
+                              uint64_t script_len,
                               uint8_t** parsed_bytecodes,
                               uint64_t* bytecode_len,
                               const char* url,
                               int startLine) {
   if (!context_->IsContextValid())
     return false;
-  return context_->EvaluateJavaScript(script->string(), script->length(), parsed_bytecodes, bytecode_len, url,
-                                      startLine);
-}
-
-bool WebFPage::evaluateScript(const uint16_t* script,
-                              size_t length,
-                              uint8_t** parsed_bytecodes,
-                              uint64_t* bytecode_len,
-                              const char* url,
-                              int startLine) {
-  if (!context_->IsContextValid())
-    return false;
-  return context_->EvaluateJavaScript(script, length, parsed_bytecodes, bytecode_len, url, startLine);
+  return context_->EvaluateJavaScript(script, script_len, parsed_bytecodes, bytecode_len, url, startLine);
 }
 
 void WebFPage::evaluateScript(const char* script, size_t length, const char* url, int startLine) {
@@ -125,7 +114,7 @@ void WebFPage::evaluateScript(const char* script, size_t length, const char* url
   context_->EvaluateJavaScript(script, length, url, startLine);
 }
 
-uint8_t* WebFPage::dumpByteCode(const char* script, size_t length, const char* url, size_t* byteLength) {
+uint8_t* WebFPage::dumpByteCode(const char* script, size_t length, const char* url, uint64_t* byteLength) {
   if (!context_->IsContextValid())
     return nullptr;
   return context_->DumpByteCode(script, length, url, byteLength);

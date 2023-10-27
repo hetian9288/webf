@@ -12,6 +12,7 @@ import 'package:webf/css.dart';
 import 'package:webf/dom.dart';
 import 'package:webf/bridge.dart';
 import 'package:webf/foundation.dart';
+import 'package:webf/launcher.dart';
 import 'package:webf/painting.dart';
 import 'package:webf/rendering.dart';
 
@@ -423,6 +424,7 @@ class ImageElement extends Element {
           url: _resolvedUri!,
           loadImage: _obtainImage,
           onImageLoad: _onImageLoad,
+          devicePixelRatio: ui.window.devicePixelRatio
         );
       }
 
@@ -439,9 +441,10 @@ class ImageElement extends Element {
         PaintingBinding.instance.imageCache.evict(previousUnSizedKey, includeLive: true);
       }
 
-      ImageConfiguration imageConfiguration = _currentImageConfig = _shouldScaling && cachedWidth != null && cachedHeight != null
-          ? ImageConfiguration(size: Size(cachedWidth.toDouble(), cachedHeight.toDouble()))
-          : ImageConfiguration.empty;
+      ImageConfiguration imageConfiguration = _currentImageConfig =
+          _shouldScaling && cachedWidth != null && cachedHeight != null
+              ? ImageConfiguration(size: Size(cachedWidth.toDouble(), cachedHeight.toDouble()))
+              : ImageConfiguration.empty;
       _updateSourceStream(provider.resolve(imageConfiguration));
 
       _isImageEncoding = false;
@@ -558,7 +561,7 @@ class ImageElement extends Element {
     // Increment count when request.
     ownerDocument.incrementRequestCount();
 
-    Uint8List data = await request._obtainImage(contextId);
+    Uint8List data = await request.obtainImage(ownerDocument.controller);
 
     // Decrement count when response.
     ownerDocument.decrementRequestCount();
@@ -598,7 +601,8 @@ class ImageElement extends Element {
     String base = ownerDocument.controller.url;
     try {
       _resolvedUri = ownerDocument.controller.uriParser!.resolve(Uri.parse(base), Uri.parse(src));
-    } catch (_) {
+    } catch (e, stack) {
+      print('$e, $stack');
       // Ignoring the failure of resolving, but to remove the resolved hyperlink.
       _resolvedUri = null;
     }
@@ -660,10 +664,12 @@ class ImageRequest {
   bool get available =>
       state == _ImageRequestState.completelyAvailable || state == _ImageRequestState.partiallyAvailable;
 
-  Future<Uint8List> _obtainImage(int? contextId) async {
-    final WebFBundle bundle = WebFBundle.fromUrl(currentUri.toString());
+  Future<Uint8List> obtainImage(WebFController controller) async {
+    final WebFBundle bundle =
+        controller.getPreloadBundleFromUrl(currentUri.toString()) ?? WebFBundle.fromUrl(currentUri.toString());
 
-    await bundle.resolve(contextId);
+    await bundle.resolve(baseUrl: controller.url, uriParser: controller.uriParser);
+    await bundle.obtainData();
 
     if (!bundle.isResolved) {
       throw FlutterError('Failed to load $currentUri');

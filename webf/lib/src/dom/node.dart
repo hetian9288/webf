@@ -279,6 +279,8 @@ abstract class Node extends EventTarget implements RenderObjectNode, LifecycleCa
 
   // Is child renderObject attached.
   bool get isRendererAttached => renderer != null && renderer!.attached;
+  // Is child renderObject attached to the render object tree segment, and may be this segment are not attached to flutter.
+  bool get isRendererAttachedToSegmentTree => renderer != null && renderer!.parent != null;
 
   bool isDescendantOf(Node? other) {
     // Return true if other is an ancestor of this, otherwise false
@@ -307,9 +309,9 @@ abstract class Node extends EventTarget implements RenderObjectNode, LifecycleCa
   /// Release any resources held by this node.
   @override
   void dispose() async {
+    super.dispose();
     parentNode?.removeChild(this);
     assert(!isRendererAttached, 'Should unmount $this before calling dispose.');
-    super.dispose();
   }
 
   @override

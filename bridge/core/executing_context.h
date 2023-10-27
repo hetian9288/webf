@@ -64,7 +64,7 @@ class ExecutingContext {
 
   static ExecutingContext* From(JSContext* ctx);
 
-  bool EvaluateJavaScript(const uint16_t* code,
+  bool EvaluateJavaScript(const char* code,
                           size_t codeLength,
                           uint8_t** parsed_bytecodes,
                           uint64_t* bytecode_len,
@@ -87,7 +87,7 @@ class ExecutingContext {
   void DrainPendingPromiseJobs();
   void DefineGlobalProperty(const char* prop, JSValueConst value);
   ExecutionContextData* contextData();
-  uint8_t* DumpByteCode(const char* code, uint32_t codeLength, const char* sourceURL, size_t* bytecodeLength);
+  uint8_t* DumpByteCode(const char* code, uint32_t codeLength, const char* sourceURL, uint64_t* bytecodeLength);
 
   // Make global object inherit from WindowProperties.
   void InstallGlobal();

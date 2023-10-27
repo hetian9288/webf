@@ -114,19 +114,18 @@ ExecutingContext* ExecutingContext::From(JSContext* ctx) {
   return static_cast<ExecutingContext*>(JS_GetContextOpaque(ctx));
 }
 
-bool ExecutingContext::EvaluateJavaScript(const uint16_t* code,
-                                          size_t codeLength,
+bool ExecutingContext::EvaluateJavaScript(const char* code,
+                                          size_t code_len,
                                           uint8_t** parsed_bytecodes,
                                           uint64_t* bytecode_len,
                                           const char* sourceURL,
                                           int startLine) {
-  std::string utf8Code = toUTF8(std::u16string(reinterpret_cast<const char16_t*>(code), codeLength));
   JSValue result;
   if (parsed_bytecodes == nullptr) {
-    result = JS_Eval(script_state_.ctx(), utf8Code.c_str(), utf8Code.size(), sourceURL, JS_EVAL_TYPE_GLOBAL);
+    result = JS_Eval(script_state_.ctx(), code, code_len, sourceURL, JS_EVAL_TYPE_GLOBAL);
   } else {
-    JSValue byte_object = JS_Eval(script_state_.ctx(), utf8Code.c_str(), utf8Code.size(), sourceURL,
-                                  JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
+    JSValue byte_object =
+        JS_Eval(script_state_.ctx(), code, code_len, sourceURL, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
     if (JS_IsException(byte_object)) {
       HandleException(&byte_object);
       return false;
@@ -288,13 +287,15 @@ ExecutionContextData* ExecutingContext::contextData() {
 uint8_t* ExecutingContext::DumpByteCode(const char* code,
                                         uint32_t codeLength,
                                         const char* sourceURL,
-                                        size_t* bytecodeLength) {
+                                        uint64_t* bytecodeLength) {
   JSValue object =
       JS_Eval(script_state_.ctx(), code, codeLength, sourceURL, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
   bool success = HandleException(&object);
   if (!success)
     return nullptr;
-  uint8_t* bytes = JS_WriteObject(script_state_.ctx(), bytecodeLength, object, JS_WRITE_OBJ_BYTECODE);
+  size_t len;
+  uint8_t* bytes = JS_WriteObject(script_state_.ctx(), &len, object, JS_WRITE_OBJ_BYTECODE);
+  *bytecodeLength = len;
   JS_FreeValue(script_state_.ctx(), object);
   return bytes;
 }
