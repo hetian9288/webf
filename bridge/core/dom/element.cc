@@ -74,14 +74,12 @@ void Element::removeAttribute(const AtomicString& name, ExceptionState& exceptio
 }
 
 BoundingClientRect* Element::getBoundingClientRect(ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   NativeValue result = InvokeBindingMethod(binding_call_methods::kgetBoundingClientRect, 0, nullptr, exception_state);
   return BoundingClientRect::Create(
       GetExecutingContext(), NativeValueConverter<NativeTypePointer<NativeBindingObject>>::FromNativeValue(result));
 }
 
 void Element::click(ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   InvokeBindingMethod(binding_call_methods::kclick, 0, nullptr, exception_state);
 }
 
@@ -90,7 +88,6 @@ void Element::scroll(ExceptionState& exception_state) {
 }
 
 void Element::scroll(double x, double y, ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   const NativeValue args[] = {
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(x),
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(y),
@@ -99,7 +96,6 @@ void Element::scroll(double x, double y, ExceptionState& exception_state) {
 }
 
 void Element::scroll(const std::shared_ptr<ScrollToOptions>& options, ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   const NativeValue args[] = {
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(options->hasLeft() ? options->left() : 0.0),
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(options->hasTop() ? options->top() : 0.0),
@@ -112,7 +108,6 @@ void Element::scrollBy(ExceptionState& exception_state) {
 }
 
 void Element::scrollBy(double x, double y, ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   const NativeValue args[] = {
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(x),
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(y),
@@ -121,7 +116,6 @@ void Element::scrollBy(double x, double y, ExceptionState& exception_state) {
 }
 
 void Element::scrollBy(const std::shared_ptr<ScrollToOptions>& options, ExceptionState& exception_state) {
-  GetExecutingContext()->FlushUICommand();
   const NativeValue args[] = {
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(options->hasLeft() ? options->left() : 0.0),
       NativeValueConverter<NativeTypeDouble>::ToNativeValue(options->hasTop() ? options->top() : 0.0),
