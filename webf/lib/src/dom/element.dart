@@ -1347,6 +1347,8 @@ abstract class Element extends ContainerNode with ElementBase, ElementEventMixin
   }
 
   void setRenderStyleProperty(String name, value) {
+    if (renderStyle.target.disposed) return;
+
     dynamic oldValue;
 
     switch(name) {
