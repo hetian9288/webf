@@ -171,8 +171,8 @@ dynamic invokeModuleEvent(double contextId, String moduleName, Event? event, ext
   _InvokeModuleCallbackContext callbackContext = _InvokeModuleCallbackContext(completer, controller, extraData);
 
   scheduleMicrotask(() {
-    _invokeModuleEvent(_allocatedPages[contextId]!, nativeModuleName, event == null ? nullptr : event.type.toNativeUtf8(),
-        rawEvent, extraData, callbackContext, callback);
+    _invokeModuleEvent(_allocatedPages[contextId]!, nativeModuleName,
+        event == null ? nullptr : event.type.toNativeUtf8(), rawEvent, extraData, callbackContext, callback);
   });
 
   return completer.future;
@@ -220,9 +220,11 @@ typedef DartEvaluateScripts = void Function(
 
 typedef NativeEvaluateJavaScriptCallback = Void Function(Handle object, Int8 result);
 
+
+typedef NativeParseHTMLCallback = Void Function(Handle object);
 // Register parseHTML
-typedef NativeParseHTML = Void Function(Pointer<Void>, Pointer<Uint8> code, Int32 length);
-typedef DartParseHTML = void Function(Pointer<Void>, Pointer<Uint8> code, int length);
+typedef NativeParseHTML = Void Function(Pointer<Void>, Pointer<Uint8> code, Int32 length, Handle context, Pointer<NativeFunction<NativeParseHTMLCallback>> result_callback);
+typedef DartParseHTML = void Function(Pointer<Void>, Pointer<Uint8> code, int length, Object context, Pointer<NativeFunction<NativeParseHTMLCallback>> result_callback);
 
 final DartEvaluateScripts _evaluateScripts =
     WebFDynamicLibrary.ref.lookup<NativeFunction<NativeEvaluateScripts>>('evaluateScripts').asFunction();
@@ -256,6 +258,7 @@ class _EvaluateScriptsContext {
   Pointer<Pointer<Uint8>>? bytecodes;
   Pointer<Uint64>? bytecodeLen;
   Uint8List originalCodeBytes;
+
   _EvaluateScriptsContext(this.completer, this.originalCodeBytes, this.codePtr, this.url);
 }
 
@@ -302,7 +305,8 @@ Future<bool> evaluateScripts(double contextId, Uint8List codeBytes, {String? url
     Completer<bool> completer = Completer();
 
     _EvaluateScriptsContext context = _EvaluateScriptsContext(completer, codeBytes, codePtr, _url);
-    Pointer<NativeFunction<NativeEvaluateJavaScriptCallback>> resultCallback = Pointer.fromFunction(handleEvaluateScriptsResult);
+    Pointer<NativeFunction<NativeEvaluateJavaScriptCallback>> resultCallback =
+        Pointer.fromFunction(handleEvaluateScriptsResult);
 
     try {
       assert(_allocatedPages.containsKey(contextId));
@@ -314,10 +318,11 @@ Future<bool> evaluateScripts(double contextId, Uint8List codeBytes, {String? url
         context.bytecodes = bytecodes;
         context.bytecodeLen = bytecodeLen;
 
-        _evaluateScripts(
-            _allocatedPages[contextId]!, codePtr, codeBytes.length, bytecodes, bytecodeLen, _url, line, context, resultCallback);
+        _evaluateScripts(_allocatedPages[contextId]!, codePtr, codeBytes.length, bytecodes, bytecodeLen, _url, line,
+            context, resultCallback);
       } else {
-        _evaluateScripts(_allocatedPages[contextId]!, codePtr, codeBytes.length, nullptr, nullptr, _url, line, context, resultCallback);
+        _evaluateScripts(_allocatedPages[contextId]!, codePtr, codeBytes.length, nullptr, nullptr, _url, line, context,
+            resultCallback);
       }
       return completer.future;
     } catch (e, stack) {
@@ -370,17 +375,31 @@ Future<bool> evaluateQuickjsByteCode(double contextId, Uint8List bytes) async {
   return completer.future;
 }
 
-void parseHTML(double contextId, Uint8List codeBytes) {
+void _handleParseHTMLContextResult(_ParseHTMLContext context) {
+  context.completer.complete();
+}
+
+class _ParseHTMLContext {
+  Completer<void> completer;
+  _ParseHTMLContext(this.completer);
+}
+
+Future<void> parseHTML(double contextId, Uint8List codeBytes) async {
+  Completer completer = Completer();
   if (WebFController.getControllerOfJSContextId(contextId) == null) {
     return;
   }
   Pointer<Uint8> codePtr = uint8ListToPointer(codeBytes);
   try {
     assert(_allocatedPages.containsKey(contextId));
-    _parseHTML(_allocatedPages[contextId]!, codePtr, codeBytes.length);
+    _ParseHTMLContext context = _ParseHTMLContext(completer);
+    Pointer<NativeFunction<NativeParseHTMLCallback>> resultCallback = Pointer.fromFunction(_handleParseHTMLContextResult);
+    _parseHTML(_allocatedPages[contextId]!, codePtr, codeBytes.length, context, resultCallback);
   } catch (e, stack) {
     print('$e\n$stack');
   }
+
+  return completer.future;
 }
 
 class GumboOutput {
@@ -401,12 +420,44 @@ void freeSVGResult(GumboOutput gumboOutput) {
   malloc.free(gumboOutput.source);
 }
 
-typedef NativeDumpQuickjsByteCode = Void Function(Pointer<Void>, Pointer<Uint8> code, Uint64 code_len, Pointer<Pointer<Uint8>> parsedBytecodes, Pointer<Uint64> bytecodeLen, Pointer<Utf8> url);
-typedef DartDumpQuickjsByteCode = void Function(Pointer<Void>, Pointer<Uint8> code, int code_len, Pointer<Pointer<Uint8>> parsedBytecodes, Pointer<Uint64> bytecodeLen, Pointer<Utf8> url);
+typedef NativeDumpQuickjsByteCodeResultCallback = Void Function(Handle object);
 
-final DartDumpQuickjsByteCode _dumpQuickjsByteCode = WebFDynamicLibrary.ref.lookup<NativeFunction<NativeDumpQuickjsByteCode>>('dumpQuickjsByteCode').asFunction();
+typedef NativeDumpQuickjsByteCode = Void Function(
+    Pointer<Void>,
+    Pointer<Uint8> code,
+    Int32 code_len,
+    Pointer<Pointer<Uint8>> parsedBytecodes,
+    Pointer<Uint64> bytecodeLen,
+    Pointer<Utf8> url,
+    Handle context,
+    Pointer<NativeFunction<NativeDumpQuickjsByteCodeResultCallback>> resultCallback);
+typedef DartDumpQuickjsByteCode = void Function(
+  Pointer<Void>,
+  Pointer<Uint8> code,
+  int code_len,
+  Pointer<Pointer<Uint8>> parsedBytecodes,
+  Pointer<Uint64> bytecodeLen,
+  Pointer<Utf8> url,
+  Object context,
+  Pointer<NativeFunction<NativeDumpQuickjsByteCodeResultCallback>> resultCallback);
 
-Uint8List dumpQuickjsByteCode(int contextId, Uint8List code, {String? url}) {
+final DartDumpQuickjsByteCode _dumpQuickjsByteCode =
+    WebFDynamicLibrary.ref.lookup<NativeFunction<NativeDumpQuickjsByteCode>>('dumpQuickjsByteCode').asFunction();
+
+class _DumpQuickjsByteCodeContext {
+  Completer<Uint8List> completer;
+  Pointer<Pointer<Uint8>> bytecodes;
+  Pointer<Uint64> bytecodeLen;
+  _DumpQuickjsByteCodeContext(this.completer, this.bytecodes, this.bytecodeLen);
+}
+
+void _handleQuickjsByteCodeResults(_DumpQuickjsByteCodeContext context) {
+  Uint8List bytes = context.bytecodes.value.asTypedList(context.bytecodeLen.value);
+  context.completer.complete(bytes);
+}
+
+Future<Uint8List> dumpQuickjsByteCode(double contextId, Uint8List code, {String? url}) async {
+  Completer<Uint8List> completer = Completer();
   // Assign `vm://$id` for no url (anonymous scripts).
   if (url == null) {
     url = 'vm://$_anonymousScriptEvaluationId';
@@ -419,10 +470,14 @@ Uint8List dumpQuickjsByteCode(int contextId, Uint8List code, {String? url}) {
   // Export the bytecode from scripts
   Pointer<Pointer<Uint8>> bytecodes = malloc.allocate(sizeOf<Pointer<Uint8>>());
   Pointer<Uint64> bytecodeLen = malloc.allocate(sizeOf<Uint64>());
-  _dumpQuickjsByteCode(_allocatedPages[contextId]!, codePtr, code.length, bytecodes, bytecodeLen, _url);
-  Uint8List bytes = bytecodes.value.asTypedList(bytecodeLen.value);
 
-  return bytes;
+  _DumpQuickjsByteCodeContext context = _DumpQuickjsByteCodeContext(completer, bytecodes, bytecodeLen);
+  Pointer<NativeFunction<NativeDumpQuickjsByteCodeResultCallback>> resultCallback = Pointer.fromFunction(_handleQuickjsByteCodeResults);
+
+  _dumpQuickjsByteCode(_allocatedPages[contextId]!, codePtr, code.length, bytecodes, bytecodeLen, _url, context, resultCallback);
+
+  // return bytes;
+  return completer.future;
 }
 
 // Register initJsEngine
@@ -573,7 +628,7 @@ typedef NativeAcquireUiCommandLocks = Pointer<Void> Function(Pointer<Void>);
 typedef DartAcquireUiCommandLocks = Pointer<void> Function(Pointer<Void>);
 
 final DartAcquireUiCommandLocks _acquireUiCommandLocks =
-WebFDynamicLibrary.ref.lookup<NativeFunction<NativeAcquireUiCommandLocks>>('acquireUiCommandLocks').asFunction();
+    WebFDynamicLibrary.ref.lookup<NativeFunction<NativeAcquireUiCommandLocks>>('acquireUiCommandLocks').asFunction();
 
 void acquireUICommandLocks(double contextId) {
   // Stop the mutations from JavaScript thread.
@@ -584,7 +639,7 @@ typedef NativeReleaseUiCommandLocks = Pointer<Void> Function(Pointer<Void>);
 typedef DartReleaseUiCommandLocks = Pointer<void> Function(Pointer<Void>);
 
 final DartReleaseUiCommandLocks _releaseUiCommandLocks =
-WebFDynamicLibrary.ref.lookup<NativeFunction<NativeReleaseUiCommandLocks>>('releaseUiCommandLocks').asFunction();
+    WebFDynamicLibrary.ref.lookup<NativeFunction<NativeReleaseUiCommandLocks>>('releaseUiCommandLocks').asFunction();
 
 void releaseUICommandLocks(double contextId) {
   // Stop the mutations from JavaScript thread.
@@ -613,7 +668,7 @@ typedef NativeIsJSThreadBlocked = Int8 Function(Pointer<Void>, Double);
 typedef DartIsJSThreadBlocked = int Function(Pointer<Void>, double);
 
 final DartIsJSThreadBlocked _isJSThreadBlocked =
-WebFDynamicLibrary.ref.lookup<NativeFunction<NativeIsJSThreadBlocked>>('isJSThreadBlocked').asFunction();
+    WebFDynamicLibrary.ref.lookup<NativeFunction<NativeIsJSThreadBlocked>>('isJSThreadBlocked').asFunction();
 
 bool isJSThreadBlocked(double contextId) {
   return _isJSThreadBlocked(dartContext!.pointer, contextId) == 1;
@@ -711,10 +766,13 @@ void flushUICommandWithContextId(double contextId) {
 }
 
 class _NativeCommandData {
-  static _NativeCommandData empty() { return _NativeCommandData(0, []); }
+  static _NativeCommandData empty() {
+    return _NativeCommandData(0, []);
+  }
 
   int length;
   List<int> rawMemory;
+
   _NativeCommandData(this.length, this.rawMemory);
 }
 
@@ -730,7 +788,8 @@ _NativeCommandData readNativeUICommandMemory(double contextId) {
     return _NativeCommandData.empty();
   }
 
-  List<int> rawMemory = nativeCommandItemPointer.cast<Int64>().asTypedList(commandLength * nativeCommandSize).toList(growable: false);
+  List<int> rawMemory =
+      nativeCommandItemPointer.cast<Int64>().asTypedList(commandLength * nativeCommandSize).toList(growable: false);
   _clearUICommandItems(_allocatedPages[contextId]!);
 
   // Release the mutations from JavaScript thread.

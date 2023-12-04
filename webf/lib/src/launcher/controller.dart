@@ -180,9 +180,7 @@ class WebFViewController implements WidgetsBindingObserver {
       required this.runningThread,
       this.navigationDelegate,
       this.gestureListener,
-      this.initialCookies,
-      // Viewport won't change when kraken page reload, should reuse previous page's viewportBox.
-      RenderViewportBox? originalViewport}) {
+      this.initialCookies}) {
   }
 
   Future<void> initialize() async {
@@ -953,10 +951,6 @@ class WebFController {
       }
 
       controlledInitCompleter.complete();
-
-      if (autoExecuteEntrypoint) {
-        executeEntrypoint();
-      }
     });
   }
 
@@ -993,6 +987,8 @@ class WebFController {
     // Should clear previous page cached ui commands
     clearUICommand(_view.contextId);
 
+    await controlledInitCompleter.future;
+
     // Wait for next microtask to make sure C++ native Elements are GC collected.
     Completer completer = Completer();
     Future.microtask(() async {
@@ -1009,8 +1005,7 @@ class WebFController {
           rootController: this,
           navigationDelegate: _view.navigationDelegate,
           gestureListener: _view.gestureListener,
-          runningThread: runningThread,
-          originalViewport: _view.viewport);
+          runningThread: runningThread);
 
       await _view.initialize();
 
@@ -1061,6 +1056,8 @@ class WebFController {
       devToolsService!.willReload();
     }
 
+    await controlledInitCompleter.future;
+
     _isComplete = false;
 
     await unload();
@@ -1077,6 +1074,8 @@ class WebFController {
     if (devToolsService != null) {
       devToolsService!.willReload();
     }
+
+    await controlledInitCompleter.future;
 
     await unload();
 
@@ -1105,6 +1104,8 @@ class WebFController {
 
     Completer completer = Completer();
 
+    await controlledInitCompleter.future;
+
     // Update entrypoint.
     _entrypoint = bundle;
     _replaceCurrentHistory(bundle);
@@ -1130,7 +1131,7 @@ class WebFController {
     if (_entrypoint!.isJavascript || _entrypoint!.isBytecode) {
       // Convert the JavaScript code into bytecode.
       if (_entrypoint!.isJavascript) {
-        _entrypoint!.preProcessing(view.contextId);
+        await _entrypoint!.preProcessing(view.contextId);
       }
       completer.complete();
     } else if (_entrypoint!.isHTML) {
@@ -1174,6 +1175,8 @@ class WebFController {
 
     Completer completer = Completer();
 
+    await controlledInitCompleter.future;
+
     // Update entrypoint.
     _entrypoint = bundle;
     _replaceCurrentHistory(bundle);
@@ -1206,10 +1209,10 @@ class WebFController {
     if (_entrypoint!.isJavascript || _entrypoint!.isBytecode) {
       // Convert the JavaScript code into bytecode.
       if (_entrypoint!.isJavascript) {
-        _entrypoint!.preProcessing(view.contextId);
+        await _entrypoint!.preProcessing(view.contextId);
       }
 
-      view.window.addEventListener(EVENT_LOAD, (event) {
+      view.window.addEventListener(EVENT_LOAD, (event) async {
         completer.complete();
       });
 
@@ -1228,22 +1231,23 @@ class WebFController {
       // Initialize document, window and the documentElement.
       flushUICommand(view);
 
-      view.document.onPreloadingFinished = () async {
-        _preRenderingStatus = PreRenderingStatus.evaluate;
-
-        if (view.document.unfinishedPreloadResources == 0 && entrypoint!.isHTML) {
-          List<VoidCallback> pendingScriptCallbacks = view.document.pendingPreloadingScriptCallbacks;
-          for (int i = 0; i < pendingScriptCallbacks.length; i ++) {
-            pendingScriptCallbacks[i]();
-          }
-        }
-
-        _preRenderingStatus = PreRenderingStatus.done;
-
-        flushUICommand(view);
-
-        completer.complete();
-      };
+      _preRenderingStatus = PreRenderingStatus.evaluate;
+      //
+      // view.document.onPreRenderingFinished = () async {
+      //
+      //   if (view.document.unfinishedPreloadResources == 0 && entrypoint!.isHTML) {
+      //     List<VoidCallback> pendingScriptCallbacks = view.document.pendingPreloadingScriptCallbacks;
+      //     for (int i = 0; i < pendingScriptCallbacks.length; i ++) {
+      //       pendingScriptCallbacks[i]();
+      //     }
+      //   }
+      //
+      //   _preRenderingStatus = PreRenderingStatus.done;
+      //
+      //   flushUICommand(view);
+      //
+      //   completer.complete();
+      // };
     }
 
     return completer.future;
@@ -1382,10 +1386,10 @@ class WebFController {
         // Prefer sync decode in loading entrypoint.
         await evaluateScripts(contextId, data, url: url);
       } else if (entrypoint.isBytecode) {
-        evaluateQuickjsByteCode(contextId, data);
+        await evaluateQuickjsByteCode(contextId, data);
       } else if (entrypoint.isHTML) {
         assert(isValidUTF8String(data), 'The HTML codes should be in UTF-8 encoding format');
-        parseHTML(contextId, data);
+        await parseHTML(contextId, data);
       } else if (entrypoint.contentType.primaryType == 'text') {
         // Fallback treating text content as JavaScript.
         try {
