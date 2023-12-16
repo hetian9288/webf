@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 
 import 'package:webf/devtools.dart';
 import 'package:webf/dom.dart';
-import 'package:webf/foundation.dart';
 import 'package:webf/rendering.dart';
 import 'package:flutter/rendering.dart';
 import 'package:webf/launcher.dart';
@@ -24,7 +23,8 @@ class InspectDOMModule extends UIInspectorModule {
   InspectDOMModule(DevToolsService devtoolsService) : super(devtoolsService);
 
   @override
-  void receiveFromFrontend(int? id, String method, Map<String, dynamic>? params) {
+  void receiveFromFrontend(
+      int? id, String method, Map<String, dynamic>? params) {
     switch (method) {
       case 'getDocument':
         onGetDocument(id, method, params);
@@ -47,10 +47,13 @@ class InspectDOMModule extends UIInspectorModule {
 
     RenderBox rootRenderObject = document.renderer!;
     BoxHitTestResult result = BoxHitTestResult();
-    rootRenderObject.hitTest(result, position: Offset(x.toDouble(), y.toDouble()));
+    rootRenderObject.hitTest(result,
+        position: Offset(x.toDouble(), y.toDouble()));
     if (result.path.first.target is RenderBoxModel) {
-      RenderBoxModel lastHitRenderBoxModel = result.path.first.target as RenderBoxModel;
-      int? targetId = view.forDevtoolsNodeId(lastHitRenderBoxModel.renderStyle.target);
+      RenderBoxModel lastHitRenderBoxModel =
+          result.path.first.target as RenderBoxModel;
+      int? targetId =
+          view.forDevtoolsNodeId(lastHitRenderBoxModel.renderStyle.target);
       sendToFrontend(
           id,
           JSONEncodableMap({
@@ -70,7 +73,8 @@ class InspectDOMModule extends UIInspectorModule {
   void onSetInspectedNode(int? id, Map<String, dynamic> params) {
     int? nodeId = params['nodeId'];
     if (nodeId == null) return;
-    Node? node = view.getBindingObject<Node>(Pointer.fromAddress(view.getTargetIdByNodeId(nodeId)));
+    Node? node = view.getBindingObject<Node>(
+        Pointer.fromAddress(view.getTargetIdByNodeId(nodeId)));
     if (node != null) {
       inspectedNode = node;
     }
@@ -88,15 +92,19 @@ class InspectDOMModule extends UIInspectorModule {
   void onGetBoxModel(int? id, Map<String, dynamic> params) {
     int? nodeId = params['nodeId'];
     if (nodeId == null) return;
-    Node? node = view.getBindingObject<Node>(Pointer.fromAddress(view.getTargetIdByNodeId(nodeId)));
+    Node? node = view.getBindingObject<Node>(
+        Pointer.fromAddress(view.getTargetIdByNodeId(nodeId)));
 
     Element? element = null;
     if (node is Element) element = node;
 
     // BoxModel design to BorderBox in kraken.
-    if (element != null && element.renderBoxModel != null && element.renderBoxModel!.hasSize) {
-      ui.Offset contentBoxOffset =
-          element.renderBoxModel!.localToGlobal(ui.Offset.zero, ancestor: element.ownerDocument.viewport);
+    if (element != null &&
+        element.renderBoxModel != null &&
+        element.renderBoxModel!.hasSize) {
+      ui.Offset contentBoxOffset = element.renderBoxModel!.localToGlobal(
+          ui.Offset.zero,
+          ancestor: element.ownerDocument.viewport);
 
       int widthWithinBorder = element.renderBoxModel!.size.width.toInt();
       int heightWithinBorder = element.renderBoxModel!.size.height.toInt();
@@ -111,34 +119,72 @@ class InspectDOMModule extends UIInspectorModule {
         contentBoxOffset.dy + heightWithinBorder,
       ];
       List<double> padding = [
-        border[0] + (element.renderBoxModel!.renderStyle.borderLeftWidth?.computedValue ?? 0),
-        border[1] + (element.renderBoxModel!.renderStyle.borderTopWidth?.computedValue ?? 0),
-        border[2] - (element.renderBoxModel!.renderStyle.borderRightWidth?.computedValue ?? 0),
-        border[3] + (element.renderBoxModel!.renderStyle.borderTopWidth?.computedValue ?? 0),
-        border[4] - (element.renderBoxModel!.renderStyle.borderRightWidth?.computedValue ?? 0),
-        border[5] - (element.renderBoxModel!.renderStyle.borderBottomWidth?.computedValue ?? 0),
-        border[6] + (element.renderBoxModel!.renderStyle.borderLeftWidth?.computedValue ?? 0),
-        border[7] - (element.renderBoxModel!.renderStyle.borderBottomWidth?.computedValue ?? 0),
+        border[0] +
+            (element.renderBoxModel!.renderStyle.borderLeftWidth
+                    ?.computedValue ??
+                0),
+        border[1] +
+            (element.renderBoxModel!.renderStyle.borderTopWidth
+                    ?.computedValue ??
+                0),
+        border[2] -
+            (element.renderBoxModel!.renderStyle.borderRightWidth
+                    ?.computedValue ??
+                0),
+        border[3] +
+            (element.renderBoxModel!.renderStyle.borderTopWidth
+                    ?.computedValue ??
+                0),
+        border[4] -
+            (element.renderBoxModel!.renderStyle.borderRightWidth
+                    ?.computedValue ??
+                0),
+        border[5] -
+            (element.renderBoxModel!.renderStyle.borderBottomWidth
+                    ?.computedValue ??
+                0),
+        border[6] +
+            (element.renderBoxModel!.renderStyle.borderLeftWidth
+                    ?.computedValue ??
+                0),
+        border[7] -
+            (element.renderBoxModel!.renderStyle.borderBottomWidth
+                    ?.computedValue ??
+                0),
       ];
       List<double> content = [
-        padding[0] + element.renderBoxModel!.renderStyle.paddingLeft.computedValue,
-        padding[1] + element.renderBoxModel!.renderStyle.paddingTop.computedValue,
-        padding[2] - element.renderBoxModel!.renderStyle.paddingRight.computedValue,
-        padding[3] + element.renderBoxModel!.renderStyle.paddingTop.computedValue,
-        padding[4] - element.renderBoxModel!.renderStyle.paddingRight.computedValue,
-        padding[5] - element.renderBoxModel!.renderStyle.paddingBottom.computedValue,
-        padding[6] + element.renderBoxModel!.renderStyle.paddingLeft.computedValue,
-        padding[7] - element.renderBoxModel!.renderStyle.paddingBottom.computedValue,
+        padding[0] +
+            element.renderBoxModel!.renderStyle.paddingLeft.computedValue,
+        padding[1] +
+            element.renderBoxModel!.renderStyle.paddingTop.computedValue,
+        padding[2] -
+            element.renderBoxModel!.renderStyle.paddingRight.computedValue,
+        padding[3] +
+            element.renderBoxModel!.renderStyle.paddingTop.computedValue,
+        padding[4] -
+            element.renderBoxModel!.renderStyle.paddingRight.computedValue,
+        padding[5] -
+            element.renderBoxModel!.renderStyle.paddingBottom.computedValue,
+        padding[6] +
+            element.renderBoxModel!.renderStyle.paddingLeft.computedValue,
+        padding[7] -
+            element.renderBoxModel!.renderStyle.paddingBottom.computedValue,
       ];
       List<double> margin = [
-        border[0] - element.renderBoxModel!.renderStyle.marginLeft.computedValue,
+        border[0] -
+            element.renderBoxModel!.renderStyle.marginLeft.computedValue,
         border[1] - element.renderBoxModel!.renderStyle.marginTop.computedValue,
-        border[2] + element.renderBoxModel!.renderStyle.marginRight.computedValue,
+        border[2] +
+            element.renderBoxModel!.renderStyle.marginRight.computedValue,
         border[3] - element.renderBoxModel!.renderStyle.marginTop.computedValue,
-        border[4] + element.renderBoxModel!.renderStyle.marginRight.computedValue,
-        border[5] + element.renderBoxModel!.renderStyle.marginBottom.computedValue,
-        border[6] - element.renderBoxModel!.renderStyle.marginLeft.computedValue,
-        border[7] + element.renderBoxModel!.renderStyle.marginBottom.computedValue,
+        border[4] +
+            element.renderBoxModel!.renderStyle.marginRight.computedValue,
+        border[5] +
+            element.renderBoxModel!.renderStyle.marginBottom.computedValue,
+        border[6] -
+            element.renderBoxModel!.renderStyle.marginLeft.computedValue,
+        border[7] +
+            element.renderBoxModel!.renderStyle.marginBottom.computedValue,
       ];
 
       BoxModel boxModel = BoxModel(
@@ -200,8 +246,10 @@ class InspectorNode extends JSONEncodable {
 
   /// Optional. The id of the parent node if any.
   int get parentId {
-    if (referencedNode.parentNode != null && referencedNode.parentNode!.pointer != null) {
-      return referencedNode.parentNode!.ownerView.forDevtoolsNodeId(referencedNode.parentNode!);
+    if (referencedNode.parentNode != null &&
+        referencedNode.parentNode!.pointer != null) {
+      return referencedNode.parentNode!.ownerView
+          .forDevtoolsNodeId(referencedNode.parentNode!);
     } else {
       return 0;
     }
@@ -263,9 +311,13 @@ class InspectorNode extends JSONEncodable {
       'childNodeCount': childNodeCount,
       'attributes': attributes,
       if (childNodeCount > 0)
-        'children': referencedNode.childNodes.where((node) {
-          return node is Element || (node is TextNode && node.data.isNotEmpty);
-        }).map((Node node) => InspectorNode(node).toJson()).toList(),
+        'children': referencedNode.childNodes
+            .where((node) {
+              return node is Element ||
+                  (node is TextNode && node.data.isNotEmpty);
+            })
+            .map((Node node) => InspectorNode(node).toJson())
+            .toList(),
     };
   }
 }
@@ -278,7 +330,13 @@ class BoxModel extends JSONEncodable {
   int? width;
   int? height;
 
-  BoxModel({this.content, this.padding, this.border, this.margin, this.width, this.height});
+  BoxModel(
+      {this.content,
+      this.padding,
+      this.border,
+      this.margin,
+      this.width,
+      this.height});
 
   @override
   Map toJson() {
