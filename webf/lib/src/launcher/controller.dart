@@ -1013,6 +1013,7 @@ class WebFController {
       devToolsService!.willReload();
     }
 
+    _isComplete = false;
     await unload();
 
     // Update entrypoint.
